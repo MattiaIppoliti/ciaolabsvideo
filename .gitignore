@@ -1,0 +1,12 @@
+# dependencies
+node_modules/
+
+# remotion / build output
+out/
+
+# logs
+*.log
+
+# os / editor
+.DS_Store
+Thumbs.db
