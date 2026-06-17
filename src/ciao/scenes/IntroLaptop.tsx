@@ -11,6 +11,7 @@ import {
 } from "remotion";
 import { SceneWrapper } from "../SceneWrapper";
 import { HomeScreen } from "../HomeScreen";
+import { ShellCard } from "../ShellCard";
 import { FONTS } from "../theme";
 import { useAuthorFrame } from "../timing";
 
@@ -605,6 +606,15 @@ export const IntroLaptop: React.FC<{ durationInFrames: number }> = ({
     easing: Easing.in(Easing.cubic),
   });
 
+  // Scene entrance: the whole machine "spunta dal basso" — it slides up into the
+  // centre from below the frame as the <SearchIntro/> search box (handed off
+  // from) shrinks and rides up off the top. Done well before the lid opens.
+  const enterY = interpolate(frame, [0, 26], [1180, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.cubic),
+  });
+
   // Screen powers on as soon as the lid starts swinging open — the content is
   // already glowing inside while the laptop is barely cracked, and reaches full
   // brightness by the time it's ~40% open (rather than only once nearly open).
@@ -624,7 +634,7 @@ export const IntroLaptop: React.FC<{ durationInFrames: number }> = ({
           justifyContent: "center",
           perspective: 1900,
           perspectiveOrigin: "50% 38%",
-          transform: `scale(${pushIn})`,
+          transform: `translateY(${enterY}px) scale(${pushIn})`,
           transformOrigin: "50% 26%",
         }}
       >
@@ -739,9 +749,9 @@ export const IntroLaptop: React.FC<{ durationInFrames: number }> = ({
                     "linear-gradient(115deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 26%, rgba(255,255,255,0) 74%, rgba(255,255,255,0.06) 100%)",
                 }}
               />
-              {/* Ciao! sparkle mark, etched in white on the lid back. The back
-                  face is rotateY(180), so scaleX(-1) makes the mark read the
-                  right way round; brightness(0) invert(1) forces it white. */}
+              {/* Waving-hand mark on the lid back, shown in its own colours. The
+                  back face is rotateY(180), so scaleX(-1) makes the mark read the
+                  right way round. No colour filter — it keeps its olive ink. */}
               <div
                 style={{
                   position: "absolute",
@@ -753,12 +763,11 @@ export const IntroLaptop: React.FC<{ durationInFrames: number }> = ({
                 }}
               >
                 <Img
-                  src={staticFile("ciao-sparkle.svg")}
+                  src={staticFile("survey.png")}
                   style={{
                     width: 150,
                     height: "auto",
-                    filter:
-                      "brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.3))",
+                    filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))",
                     opacity: 0.92,
                   }}
                 />
@@ -800,35 +809,19 @@ export const IntroLaptop: React.FC<{ durationInFrames: number }> = ({
                     )})`,
                   }}
                 >
-                  {/* Live screen: the moving-sea shader (background-30s, from the
-                      4s mark) plays behind the homepage. The page holds at the top
-                      while the laptop opens and the camera dives in; <Hero/> picks
-                      up the same sea + page and scrolls it once it has landed. The
-                      16:9 panel matches the 16:9 frame <Hero/> fills, so the dive
-                      out of the screen is seamless. The page is authored at
-                      1920×1080 and scaled 0.602 to fit the 1156×650 panel. */}
-                  <OffthreadVideo
-                    src={staticFile("background-30s.webm")}
-                    muted
-                    trimBefore={SEA_TRIM}
-                    // Don't let a transient preview seek error throw a
-                    // MediaPlaybackError and crash the player; recover on the next
-                    // frame. Re-throw during a real render so a missing frame never
-                    // silently corrupts the output.
-                    onError={(e) => {
-                      if (getRemotionEnvironment().isRendering) {
-                        throw e;
-                      }
-                      console.warn("Laptop backdrop video failed in preview.", e);
-                    }}
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
+                  {/* Live screen, authored as a faithful 1920×1080 miniature of
+                      <Hero/>'s frame so the camera's dive out of the display lands
+                      on a pixel-identical layout (no swap of UIs). The 16:9 panel
+                      matches the 16:9 frame <Hero/> fills; the whole stack is built
+                      at 1920×1080 and scaled 0.602 to fit the 1156×650 panel. The
+                      layer order mirrors <Hero/> exactly: the moving-sea shader
+                      (background-30s, from the 4s mark) at the back, then the warm
+                      hero-sun <ShellCard/> (the SAME warm backdrop <Hero/> sits on,
+                      previously missing here — which is why the screen used to read
+                      cold blue instead of <Hero/>'s warm cream), then the page. The
+                      page holds at the top while the laptop opens and the camera
+                      dives in; <Hero/> picks up the same sea + page and scrolls it
+                      once it has landed, so the hand-off is seamless. */}
                   <div
                     style={{
                       position: "absolute",
@@ -840,6 +833,50 @@ export const IntroLaptop: React.FC<{ durationInFrames: number }> = ({
                       transformOrigin: "center center",
                     }}
                   >
+                    {/* Light base behind the sea video: matches the SeaShader's
+                        near-white (#eef0f4) base, so before the video's first
+                        frame is decoded (the laptop's opening frames / preview
+                        scrubbing) the screen reads white like the live site
+                        rather than letting the black bezel show through the
+                        still-transparent page. */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: "#eef0f4",
+                      }}
+                    />
+                    <OffthreadVideo
+                      src={staticFile("background-30s.webm")}
+                      muted
+                      trimBefore={SEA_TRIM}
+                      // Don't let a transient preview seek error throw a
+                      // MediaPlaybackError and crash the player; recover on the next
+                      // frame. Re-throw during a real render so a missing frame never
+                      // silently corrupts the output.
+                      onError={(e) => {
+                        if (getRemotionEnvironment().isRendering) {
+                          throw e;
+                        }
+                        console.warn("Laptop backdrop video failed in preview.", e);
+                      }}
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                    />
+                    {/* Warm hero-sun card over the sea. <Hero/> gets the same
+                        backdrop from the global <ShellCard/> in <CiaoVideo/>, where
+                        the full-frame sea on top mutes the aura to a neutral warm
+                        cream; here the sea sits behind, so the card is held at a
+                        matching partial opacity to land on the same muted warmth
+                        rather than a stronger peach glow. */}
+                    <div style={{ position: "absolute", inset: 0, opacity: 0.6 }}>
+                      <ShellCard />
+                    </div>
                     <HomeScreen />
                   </div>
                 </div>

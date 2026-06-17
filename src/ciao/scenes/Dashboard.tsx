@@ -1,5 +1,5 @@
 import React from "react";
-import { Easing, interpolate } from "remotion";
+import { Easing, interpolate, spring, useVideoConfig } from "remotion";
 import { SceneWrapper } from "../SceneWrapper";
 import { BrowserFrame } from "../BrowserFrame";
 import { Cursor } from "../Cursor";
@@ -19,11 +19,18 @@ const TRAIT_TIP = {
   percentile: 95,
 } as const;
 const HOVER_X_PCT = 56; // where along the bar the pointer settles
-const BAR_CENTER_Y = 64; // label block (~36px) + half of the 56px bar
+const BAR_CENTER_Y = 60; // label block (~36px) + half of the 48px bar
+const CLICK = 122; // beat the pointer lands + clicks the Fantasy bar
 const C_FADE = [96, 108] as const; // pointer fades in
 const C_GLIDE = [98, 122] as const; // pointer glides to the bar
 const BAR_HOVER = [112, 124] as const; // bar lifts + glows under the pointer
 const TIP_REVEAL = [122, 138] as const; // tooltip pops above the bar
+
+// Browser window size for this scene. Tall enough that all three top-trait bars
+// (Fantasy / Empathy / Assertiveness) clear the frame instead of being clipped
+// to just the first row.
+const WIN_W = 1480;
+const WIN_H = 1000;
 
 // Screenshot 3: "Your scores" with 3 half-gauges (Openness/Conscientiousness/
 // Extraversion), HIGHEST/LOWEST toggle and Top Traits bars (NEO tab).
@@ -31,14 +38,80 @@ export const Dashboard: React.FC<{ durationInFrames: number }> = ({
   durationInFrames,
 }) => {
   const frame = useAuthorFrame();
+  const { fps } = useVideoConfig();
+
+  // --- camera fly-over onto the Fantasy bar (same treatment as the survey
+  // click): hold on the full dashboard, quickly push in onto the top trait as
+  // the pointer clicks it, hold a beat while the detail card reveals, then ease
+  // back out to rest. Focus (FX, FY) is a window-space point; the translate
+  // puts it dead-centre at zoom Z while RX/RY bank the window under <perspective>.
+  const WIN_CX = WIN_W / 2;
+  const WIN_CY = WIN_H / 2;
+  const FOCUS = { x: 800, y: 675 }; // Fantasy bar centre in window space
+  const CAM_FRAMES = [0, 106, CLICK, CLICK + 16, CLICK + 28, durationInFrames];
+  const CAM_FX = [WIN_CX, WIN_CX, FOCUS.x, FOCUS.x, WIN_CX, WIN_CX];
+  const CAM_FY = [WIN_CY, WIN_CY, FOCUS.y, FOCUS.y, WIN_CY, WIN_CY];
+  const CAM_Z = [1, 1, 1.45, 1.45, 1, 1];
+  const CAM_RX = [0, 0, 3, 3, 0, 0];
+  const CAM_RY = [0, 0, -4, -4, 0, 0];
+  const camEase = { ...clamp, easing: Easing.inOut(Easing.cubic) } as const;
+  const camFx = interpolate(frame, CAM_FRAMES, CAM_FX, camEase);
+  const camFy = interpolate(frame, CAM_FRAMES, CAM_FY, camEase);
+  const camZ = interpolate(frame, CAM_FRAMES, CAM_Z, camEase);
+  const camRx = interpolate(frame, CAM_FRAMES, CAM_RX, camEase);
+  const camRy = interpolate(frame, CAM_FRAMES, CAM_RY, camEase);
+  const cameraTransform =
+    `rotateX(${camRx}deg) rotateY(${camRy}deg) scale(${camZ}) ` +
+    `translate(${-(camFx - WIN_CX)}px, ${-(camFy - WIN_CY)}px)`;
+
+  // Entrance: the whole dashboard window slides in from the right toward centre,
+  // picking up where the interlude's bubbles parted and left the stage clear.
+  const entranceX = interpolate(frame, [0, 20], [1700, 0], {
+    ...clamp,
+    easing: Easing.out(Easing.cubic),
+  });
+
+  // Exit: once the camera has settled back to rest, the whole window launches
+  // off to the left with the same springy elasticity as the survey window's
+  // exit in the interlude — an exit only shows the accelerating launch, so the
+  // spring's settle happens safely off-screen, handing over to the chat bridge.
+  const exit = spring({
+    frame: frame - (CLICK + 28),
+    fps,
+    config: { damping: 18, mass: 0.9 },
+    durationInFrames: 28,
+  });
+  const exitX = interpolate(exit, [0, 1], [0, -1980]);
+
+  // A cream backdrop fades in just before the window launches, so it slides off
+  // over flat cream rather than the cool cloud background — handing straight to
+  // the chat bridge, which opens on this same cream before warming to pink.
+  const creamReveal = interpolate(frame, [CLICK + 22, CLICK + 34], [0, 1], clamp);
 
   return (
-    <SceneWrapper durationInFrames={durationInFrames}>
-      <BrowserFrame
-        url="platform.ciaobang.com/surveys/personality/dashboard"
-        width={1480}
-        height={880}
-      >
+    <SceneWrapper
+      durationInFrames={durationInFrames}
+      fadeIn={0}
+      fadeOut={0}
+      style={{ perspective: 2000 }}
+    >
+      {/* cream backdrop revealed as the window launches off to the left */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: COLORS.cream,
+          opacity: creamReveal,
+          pointerEvents: "none",
+        }}
+      />
+      <div style={{ transform: `translateX(${entranceX + exitX}px)` }}>
+        <div style={{ width: WIN_W, height: WIN_H, transform: cameraTransform }}>
+        <BrowserFrame
+          url="platform.ciaobang.com/surveys/personality/dashboard"
+          width={WIN_W}
+          height={WIN_H}
+        >
         <div
           style={{
             padding: 28,
@@ -167,7 +240,7 @@ export const Dashboard: React.FC<{ durationInFrames: number }> = ({
                 marginTop: 22,
                 display: "flex",
                 flexDirection: "column",
-                gap: 22,
+                gap: 18,
               }}
             >
               {TOP_TRAITS.map((t, i) => (
@@ -184,7 +257,9 @@ export const Dashboard: React.FC<{ durationInFrames: number }> = ({
             </div>
           </div>
         </div>
-      </BrowserFrame>
+        </BrowserFrame>
+        </div>
+      </div>
     </SceneWrapper>
   );
 };
@@ -232,8 +307,8 @@ const Gauge: React.FC<{
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const size = 280;
-  const stroke = 28;
+  const size = 240;
+  const stroke = 26;
   const r = (size - stroke) / 2;
   const c = Math.PI * r;
   return (
@@ -374,6 +449,10 @@ const TraitBar: React.FC<{
     ...clamp,
     easing: Easing.out(Easing.cubic),
   });
+  // quick press dip as the pointer taps the bar (drives the camera's push-in)
+  const press = tip
+    ? interpolate(frame, [CLICK - 4, CLICK, CLICK + 6], [0, 1, 0], clamp)
+    : 0;
 
   return (
     <div
@@ -389,7 +468,7 @@ const TraitBar: React.FC<{
       </div>
       <div
         style={{
-          height: 56,
+          height: 48,
           borderRadius: 14,
           background: COLORS.oatLight,
           overflow: "hidden",
@@ -495,7 +574,7 @@ const TraitBar: React.FC<{
           </div>
 
           {/* macOS pointer hovering on the bar (tip lands on the anchor) */}
-          <Cursor x={glideX} y={glideY} press={0} opacity={cursorOpacity} />
+          <Cursor x={glideX} y={glideY} press={press} opacity={cursorOpacity} />
         </div>
       )}
     </div>

@@ -104,6 +104,7 @@ export const SurveyQuestion: React.FC<{ durationInFrames: number }> = ({
     <SceneWrapper
       durationInFrames={durationInFrames}
       fadeIn={0}
+      fadeOut={0}
       style={{ perspective: 2000 }}
     >
       <div

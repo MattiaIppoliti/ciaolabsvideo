@@ -1,4 +1,5 @@
 import React from "react";
+import { Img, staticFile } from "remotion";
 import { CiaoLogo } from "./CiaoLogo";
 import { SURVEY_WIN, SurveyWindow } from "./SurveyWindow";
 import { COLORS, FONTS, NAV_ITEMS } from "./theme";
@@ -104,17 +105,25 @@ export const HomeScreen: React.FC<{
             </div>
           ))}
         </div>
-        <div
-          style={{
-            background: COLORS.ink,
-            color: COLORS.white,
-            padding: "16px 28px",
-            borderRadius: 999,
-            fontSize: 20,
-            fontWeight: 600,
-          }}
-        >
-          Sign in to start →
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <NavIconButton>
+            <NavIconImage src="docs.png" />
+          </NavIconButton>
+          <NavIconButton>
+            <NavIconImage src="app.png" />
+          </NavIconButton>
+          <div
+            style={{
+              background: COLORS.ink,
+              color: COLORS.white,
+              padding: "16px 28px",
+              borderRadius: 999,
+              fontSize: 20,
+              fontWeight: 600,
+            }}
+          >
+            Sign in to start →
+          </div>
         </div>
       </div>
 
@@ -227,6 +236,35 @@ export const HomeScreen: React.FC<{
     </div>
   );
 };
+
+// Circular icon button matching the nav CTA's height, sitting to its left.
+const NavIconButton: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => (
+  <div
+    style={{
+      width: 52,
+      height: 52,
+      borderRadius: 999,
+      background: COLORS.white,
+      border: `1.5px solid ${COLORS.lineStrong}`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: COLORS.ink,
+    }}
+  >
+    {children}
+  </div>
+);
+
+// Nav icon artwork (docs.png / app.png) shown as-is inside the round button.
+const NavIconImage: React.FC<{ src: string }> = ({ src }) => (
+  <Img
+    src={staticFile(src)}
+    style={{ width: 30, height: 30, objectFit: "contain", display: "block" }}
+  />
+);
 
 const GithubMark: React.FC = () => (
   <div
