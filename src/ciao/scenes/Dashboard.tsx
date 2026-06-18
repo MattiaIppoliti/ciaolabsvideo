@@ -1,12 +1,24 @@
 import React from "react";
-import { Easing, interpolate, spring, useVideoConfig } from "remotion";
+import {
+  Easing,
+  Img,
+  interpolate,
+  spring,
+  staticFile,
+  useVideoConfig,
+} from "remotion";
 import { SceneWrapper } from "../SceneWrapper";
+import { DotGrid } from "../Background";
 import { BrowserFrame } from "../BrowserFrame";
 import { Cursor } from "../Cursor";
 import { COLORS, FONTS, SCORES, TOP_TRAITS } from "../theme";
 import { useAuthorFrame } from "../timing";
 
-export const DASHBOARD_DURATION = 180;
+// 172 (not 180): once the window has launched off to the left and the cream
+// backdrop is fully up (~frame 168), the scene was holding on flat cream for
+// ~12 dead frames before the cut. Ending at 172 hands straight to the chat
+// bridge the moment the stage is clear, so the cream never lingers.
+export const DASHBOARD_DURATION = 172;
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -41,14 +53,18 @@ export const Dashboard: React.FC<{ durationInFrames: number }> = ({
   const { fps } = useVideoConfig();
 
   // --- camera fly-over onto the Fantasy bar (same treatment as the survey
-  // click): hold on the full dashboard, quickly push in onto the top trait as
-  // the pointer clicks it, hold a beat while the detail card reveals, then ease
-  // back out to rest. Focus (FX, FY) is a window-space point; the translate
-  // puts it dead-centre at zoom Z while RX/RY bank the window under <perspective>.
+  // click): hold on the full dashboard, push in onto the top trait as the
+  // pointer clicks it, hold a beat while the detail card reveals, then ease back
+  // out to rest. The push-in (22f) and pull-out (16f) are deliberately gentle so
+  // neither move feels abrupt; the push-in still lands exactly on the click, and
+  // the pull-out tails just past the window's launch so it settles as the window
+  // is already accelerating off — an imperceptible overlap. Focus (FX, FY) is a
+  // window-space point; the translate puts it dead-centre at zoom Z while RX/RY
+  // bank the window under <perspective>.
   const WIN_CX = WIN_W / 2;
   const WIN_CY = WIN_H / 2;
   const FOCUS = { x: 800, y: 675 }; // Fantasy bar centre in window space
-  const CAM_FRAMES = [0, 106, CLICK, CLICK + 16, CLICK + 28, durationInFrames];
+  const CAM_FRAMES = [0, 100, CLICK, CLICK + 16, CLICK + 32, durationInFrames];
   const CAM_FX = [WIN_CX, WIN_CX, FOCUS.x, FOCUS.x, WIN_CX, WIN_CX];
   const CAM_FY = [WIN_CY, WIN_CY, FOCUS.y, FOCUS.y, WIN_CY, WIN_CY];
   const CAM_Z = [1, 1, 1.45, 1.45, 1, 1];
@@ -83,10 +99,21 @@ export const Dashboard: React.FC<{ durationInFrames: number }> = ({
   });
   const exitX = interpolate(exit, [0, 1], [0, -1980]);
 
-  // A cream backdrop fades in just before the window launches, so it slides off
-  // over flat cream rather than the cool cloud background — handing straight to
-  // the chat bridge, which opens on this same cream before warming to pink.
+  // A cream backdrop fades in just before the window launches, so the window
+  // slides off over cream rather than the cool cloud background.
   const creamReveal = interpolate(frame, [CLICK + 22, CLICK + 34], [0, 1], clamp);
+
+  // ...but the cream is only a brief intermediate: the instant the window starts
+  // leaving, the backdrop already begins warming into the chat bridge's
+  // surveys-sun pink — fast but gradual — so the colour is sweeping into the
+  // next sequence as the dashboard clears, instead of dwelling on flat cream.
+  // The sun is pixel-matched to <ChatBridge/> (same image, fit and settled
+  // scale) and finishes blooming exactly at the cut, so the handover is seamless.
+  const warm = interpolate(frame, [CLICK + 28, durationInFrames], [0, 1], {
+    ...clamp,
+    easing: (t) => 1 - Math.pow(1 - t, 3),
+  });
+  const sunScale = interpolate(warm, [0, 1], [0.94, 1]);
 
   return (
     <SceneWrapper
@@ -105,6 +132,34 @@ export const Dashboard: React.FC<{ durationInFrames: number }> = ({
           pointerEvents: "none",
         }}
       />
+      {/* the warm surveys-sun backdrop sweeps in over the cream as the window
+          leaves, so the colour is already changing into the next sequence —
+          pixel-matched to <ChatBridge/> for a seamless cut */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: warm,
+          pointerEvents: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Img
+          src={staticFile("surveys-sun.png")}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "center 0%",
+            transform: `scale(${sunScale})`,
+          }}
+        />
+      </div>
+      {/* keep the dot texture present over the warming backdrop, matching the
+          bridge that picks up from here */}
+      <DotGrid opacity={warm} />
       <div style={{ transform: `translateX(${entranceX + exitX}px)` }}>
         <div style={{ width: WIN_W, height: WIN_H, transform: cameraTransform }}>
         <BrowserFrame

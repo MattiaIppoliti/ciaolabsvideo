@@ -5,9 +5,7 @@ import {
   Img,
   interpolate,
   OffthreadVideo,
-  spring,
   staticFile,
-  useVideoConfig,
 } from "remotion";
 import { SceneWrapper } from "../SceneWrapper";
 import { HomeScreen } from "../HomeScreen";
@@ -15,7 +13,7 @@ import { ShellCard } from "../ShellCard";
 import { FONTS } from "../theme";
 import { useAuthorFrame } from "../timing";
 
-export const INTRO_DURATION = 120;
+export const INTRO_DURATION = 135;
 
 // background-30s.webm opens on ~4s of the live homepage, then settles into its
 // pure moving-sea shader. We cut those first 4s away (trimBefore = SEA_TRIM) and
@@ -565,7 +563,6 @@ const SpeakerGrille: React.FC<{ side: "left" | "right" }> = ({ side }) => (
 export const IntroLaptop: React.FC<{ durationInFrames: number }> = ({
   durationInFrames,
 }) => {
-  const { fps } = useVideoConfig();
   const frame = useAuthorFrame();
 
   // Hold closed for a beat, then the lid swings open about the back hinge.
@@ -573,11 +570,16 @@ export const IntroLaptop: React.FC<{ durationInFrames: number }> = ({
   // with the aluminium back facing up; open = standing, slightly reclined.
   const CLOSED_ANGLE = -(180 - DECK_TILT); // -118: coplanar with the deck
   const OPEN_ANGLE = -6; // standing, a touch of recline
-  const open = spring({
-    frame: frame - 18,
-    fps,
-    config: { damping: 200, mass: 1.2 },
-    durationInFrames: 52,
+  // One smooth, even swing. An ease-in-out gives a symmetric, bell-shaped
+  // angular velocity: the lid lifts gently off the deck, cruises through the
+  // middle, and settles — without the long decelerating "crawl" the previous
+  // heavily-overdamped spring (damping 200) left in the last ~14°, which read as
+  // the lid slowing to a near-stop. The motion then flows straight into the
+  // camera dive below, so the opening never stalls-and-resumes.
+  const open = interpolate(frame, [14, 76], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.inOut(Easing.cubic),
   });
   const lidAngle = interpolate(open, [0, 1], [CLOSED_ANGLE, OPEN_ANGLE]);
 
@@ -589,21 +591,23 @@ export const IntroLaptop: React.FC<{ durationInFrames: number }> = ({
     extrapolateRight: "clamp",
   });
 
-  // Settle, then dive the camera into the display to hand off to Hero. A small
-  // lean (≈1.08) holds while the page powers on, then an accelerating push
-  // drives the screen content to fill the frame. The zoom origin sits high, on
-  // the screen body (≈50% / 26% of the 1920×1080 frame), so we fly *into* the
-  // display and the keyboard deck drops out of frame rather than staying
-  // centred. The deeper final scale clears the bezel and deck well before the
-  // handoff.
+  // Dive the camera into the display to hand off to Hero. The push now *overlaps*
+  // the tail of the lid opening — it starts at frame 48, while the lid is still
+  // settling, and ramps up with a gentle ease-in — so apparent motion flows
+  // straight from "lid swinging" into "camera flying in" with nothing in
+  // between. The old version held a flat ≈1.08 lean from frame 73→91 (after the
+  // lid had already finished), which read as a dead pause before the dive kicked
+  // in: the "rallentamento poi riprende". The zoom origin sits high, on the
+  // screen body (≈50% / 26% of the 1920×1080 frame), so we fly *into* the display
+  // and the keyboard deck drops out of frame rather than staying centred.
   // The push ends right as the display fills the frame (≈2.3× the rig), so the
   // homepage on the screen lands at ~1:1 — the same size <Hero/> opens at. Going
   // deeper would blow the page up past frame size and pop on the cut.
   const riseY = interpolate(open, [0, 1], [50, 0]);
-  const pushIn = interpolate(frame, [58, 76, INTRO_DURATION], [1, 1.08, 2.3], {
+  const pushIn = interpolate(frame, [48, INTRO_DURATION], [1, 2.3], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
+    easing: Easing.in(Easing.quad),
   });
 
   // Scene entrance: the whole machine "spunta dal basso" — it slides up into the

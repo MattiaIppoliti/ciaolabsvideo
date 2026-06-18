@@ -21,8 +21,6 @@ export const TOTAL = 181;
 export const BEFORE_COUNT = 95;
 export const AFTER_COUNT = 96;
 
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
-
 export interface SurveyWindowProps {
   /** answered counter shown in the sidebar + progress bar */
   answered?: number;
@@ -34,8 +32,6 @@ export interface SurveyWindowProps {
   reflow?: number;
   /** 0→1 the response-pattern violin grows in */
   panelReveal?: number;
-  /** 0→1 the "My score" marker drops onto its option */
-  myDrop?: number;
   /** whether the answer is committed (highlights option 5 in the grid) */
   selectedActive?: boolean;
   /** committed-answer "pop" applied to the selected card */
@@ -53,7 +49,6 @@ export const SurveyWindow: React.FC<SurveyWindowProps> = ({
   sidebarT = 0,
   reflow = 0,
   panelReveal = 0,
-  myDrop = 0,
   selectedActive = false,
   pressPulse = 1,
   width = SURVEY_WIN.width,
@@ -192,7 +187,6 @@ export const SurveyWindow: React.FC<SurveyWindowProps> = ({
                   pattern={RESPONSE_PATTERN}
                   selected={SELECTED}
                   reveal={panelReveal}
-                  myDrop={myDrop}
                   show={reflow}
                 />
               </div>
@@ -764,13 +758,11 @@ const ViolinPanel: React.FC<{
   pattern: readonly number[];
   selected: number;
   reveal: number;
-  myDrop: number;
   show: number;
-}> = ({ pattern, selected, reveal, myDrop, show }) => {
+}> = ({ pattern, selected, reveal, show }) => {
   const total = pattern.reduce((a, p) => a + p, 0);
   const othersPos = pattern.reduce((a, p, i) => a + p * (i + 1), 0) / total;
   const path = buildViolin(pattern, reveal);
-  const dropY = interpolate(myDrop, [0, 0.7, 1], [-44, 6, 0]);
 
   return (
     <div
@@ -888,13 +880,14 @@ const ViolinPanel: React.FC<{
           dy={0}
         />
 
-        {/* "My score" marker — drops onto option 5 */}
+        {/* "My score" marker — already sitting on the axis (like "Others"),
+            fading in with the panel rather than dropping onto its option. */}
         <Marker
           left={xPct(selected)}
           label="My score"
           color={COLORS.lemon}
-          opacity={interpolate(myDrop, [0, 0.25], [0, 1], clamp)}
-          dy={dropY}
+          opacity={reveal}
+          dy={0}
         />
       </div>
     </div>

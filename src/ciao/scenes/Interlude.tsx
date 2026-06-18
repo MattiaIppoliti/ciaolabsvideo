@@ -118,7 +118,6 @@ export const Interlude: React.FC<{ durationInFrames: number }> = ({
           sidebarT={1}
           reflow={1}
           panelReveal={1}
-          myDrop={1}
           selectedActive
           pressPulse={1}
         />

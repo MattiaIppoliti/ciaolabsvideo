@@ -4,6 +4,7 @@ import {
   continueRender,
   delayRender,
   staticFile,
+  useCurrentFrame,
   useVideoConfig,
 } from "remotion";
 
@@ -14,9 +15,16 @@ import {
 // the live site pixel-for-pixel and there is no <video> to decode/seek in the
 // Studio preview.
 //
-// The shader's uTime is driven by the requestAnimationFrame timestamp, which
-// Remotion mocks deterministically during rendering — so the sea advances in
-// lock-step with the frame being rendered and the output is reproducible.
+// The vendored shader animates itself on its OWN requestAnimationFrame loop,
+// driving uTime from the wall-clock rAF timestamp. That makes the sea advance at
+// real time regardless of how fast the timeline is actually playing/rendering:
+// in the Studio preview (and in renders that can't hold 60fps) the heavy scenes
+// drop frames, so the timeline lags while the sea keeps racing ahead — the sea
+// looks "too fast" and jittery everywhere except the light scenes that sustain
+// full speed. To fix it we intercept that rAF loop (see `captureAnimationLoop`)
+// and instead tick it once per Remotion frame with a deterministic timestamp
+// derived from useCurrentFrame(). The sea is then frame-locked: identical in the
+// preview and the render, reproducible, and decoupled from wall-clock speed.
 
 type SerendipityUniform = { value: number };
 type SerendipityResolutionUniform = { value: [number, number] };
@@ -173,12 +181,56 @@ function fillFrame(host: HTMLElement, lib: SerendipityOgl) {
   if (uResolution) uResolution.value = [host.clientWidth, host.clientHeight];
 }
 
+// Sentinel handle our fake requestAnimationFrame hands back for the shader's own
+// loop, so the library's `cancelAnimationFrame(W)` in dispose() is a no-op for us
+// (we own the loop) while every other caller's handle still cancels for real.
+const SHADER_RAF_HANDLE = -1;
+
+// Hijack the library's self-driving requestAnimationFrame loop. The shader
+// schedules exactly one rAF at the end of initialize() and then reschedules the
+// same callback (`Q`) on every tick; we capture that callback into `tickRef`
+// instead of letting it run on the real wall clock, and pass every OTHER rAF
+// caller straight through. Returns a teardown that restores the real APIs.
+function captureAnimationLoop(
+  tickRef: React.MutableRefObject<FrameRequestCallback | null>,
+): () => void {
+  const realRaf = window.requestAnimationFrame.bind(window);
+  const realCancel = window.cancelAnimationFrame.bind(window);
+  // The first rAF registered after install is the loop's kickoff from
+  // initialize(); after that the callback reference (`Q`) is stable, so we keep
+  // swallowing it and let everything else schedule normally.
+  let capturing = true;
+  let shaderCb: FrameRequestCallback | null = null;
+
+  window.requestAnimationFrame = (cb: FrameRequestCallback): number => {
+    if (capturing || cb === shaderCb) {
+      capturing = false;
+      shaderCb = cb;
+      tickRef.current = cb;
+      return SHADER_RAF_HANDLE;
+    }
+    return realRaf(cb);
+  };
+  window.cancelAnimationFrame = (h: number): void => {
+    if (h !== SHADER_RAF_HANDLE) realCancel(h);
+  };
+
+  return () => {
+    window.requestAnimationFrame = realRaf;
+    window.cancelAnimationFrame = realCancel;
+  };
+}
+
 export const SeaShader: React.FC = () => {
   const hostRef = React.useRef<HTMLDivElement | null>(null);
-  const { width, height } = useVideoConfig();
+  const { width, height, fps } = useVideoConfig();
+  const frame = useCurrentFrame();
   const [handle] = React.useState(() =>
     delayRender("serendipity-ogl shader init"),
   );
+  // The library's animation callback, captured from its rAF loop so we can tick
+  // it ourselves once per Remotion frame (see captureAnimationLoop).
+  const tickRef = React.useRef<FrameRequestCallback | null>(null);
 
   React.useEffect(() => {
     const host = hostRef.current;
@@ -189,6 +241,7 @@ export const SeaShader: React.FC = () => {
 
     let cancelled = false;
     let unpin: (() => void) | null = null;
+    let restoreRaf: (() => void) | null = null;
     loadScript()
       .then(() => {
         if (cancelled) return;
@@ -198,9 +251,15 @@ export const SeaShader: React.FC = () => {
             // Pin BEFORE initialize(): the library's init runs its first resize
             // synchronously, sizing everything to the composition frame.
             unpin = pinWindowSize(window, width, height);
+            // Take over the loop BEFORE initialize() so we catch its rAF kickoff
+            // and the sea never advances on the wall clock.
+            restoreRaf = captureAnimationLoop(tickRef);
             lib.initialize(host);
             applyPreset(lib);
             fillFrame(host, lib);
+            // Draw the frame we mounted on right away; subsequent frames are
+            // driven by the layout effect below as useCurrentFrame() advances.
+            tickRef.current?.((frame / fps) * 1000);
           } catch (err) {
             console.error("SeaShader init failed", err);
           }
@@ -223,9 +282,21 @@ export const SeaShader: React.FC = () => {
         }
       }
       host.querySelectorAll("canvas").forEach((c) => c.remove());
+      tickRef.current = null;
+      restoreRaf?.();
       unpin?.();
     };
-  }, [handle, width, height]);
+    // `frame` is intentionally omitted: init runs once and seeds the first draw;
+    // the layout effect below owns per-frame ticking.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handle, width, height, fps]);
+
+  // Advance the sea deterministically: one tick per Remotion frame with a
+  // frame-derived timestamp (ms), so the shader is frame-locked and identical in
+  // the preview and the render instead of free-running on wall-clock time.
+  React.useLayoutEffect(() => {
+    tickRef.current?.((frame / fps) * 1000);
+  }, [frame, fps]);
 
   return (
     <AbsoluteFill style={{ background: "#eef0f4" }}>

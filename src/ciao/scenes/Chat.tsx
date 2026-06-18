@@ -19,17 +19,19 @@ import { useAuthorFrame } from "../timing";
 
 // +30 author frames (1s @ 30fps) of tail after the pill flips to the Ciao!
 // lockup, so the waving sparkle completes its loop before the video ends.
-// A further +30 holds on the "Waving…" indicator (see OUTRO_START) so its loop
-// completes before the window drops away.
-export const CHAT_DURATION = 464;
+// (Was 464 — trimmed 50 author frames of the static hold that used to sit
+// before the outro, see OUTRO_START, so the closing window-drop begins as soon
+// as the conversation has settled instead of lingering on a frozen frame.)
+export const CHAT_DURATION = 414;
 
 // Closing beat. Once the conversation has fully read out, the whole window
 // glides from centre down off the bottom edge — handing the frame to the
 // sign-off: the `surveys-sun-blue` orb blooms in behind, and a centred pill
 // carrying the platform link rises from below to settle dead-centre over it.
-// Held +30 author frames (1s @ 30fps) past the wave's entrance (SEND + 224 =
-// 304) so the "Waving…" indicator completes its loop before the window leaves.
-const OUTRO_START = 338;
+// Begins ~40 author frames after the last reveal (the "Waving…" indicator at
+// ~248) — just enough for the conversation to settle, without the extra ~50
+// frames of dead hold that used to sit here (was 338).
+const OUTRO_START = 288;
 
 // The scene opens by simulating the question being typed into the composer:
 // the camera flies down onto the input bar (same 3D treatment as the survey),
@@ -493,12 +495,12 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
                 }}
               >
                 {BULLETS.map((b, i) => {
-                  const start = SEND + 104 + i * 24;
-                  const op = interpolate(frame, [start, start + 14], [0, 1], {
+                  const start = SEND + 92 + i * 10;
+                  const op = interpolate(frame, [start, start + 8], [0, 1], {
                     extrapolateLeft: "clamp",
                     extrapolateRight: "clamp",
                   });
-                  const ty = interpolate(frame, [start, start + 14], [10, 0], {
+                  const ty = interpolate(frame, [start, start + 8], [10, 0], {
                     extrapolateLeft: "clamp",
                     extrapolateRight: "clamp",
                   });
@@ -543,7 +545,7 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
                   padding: "14px 18px",
                   fontSize: 18,
                   color: COLORS.inkSoft,
-                  opacity: interpolate(frame, [SEND + 184, SEND + 204], [0, 1], {
+                  opacity: interpolate(frame, [SEND + 130, SEND + 140], [0, 1], {
                     extrapolateLeft: "clamp",
                     extrapolateRight: "clamp",
                   }),
@@ -568,7 +570,7 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
               <div
                 style={{
                   marginTop: 4,
-                  opacity: interpolate(frame, [SEND + 210, SEND + 224], [0, 1], {
+                  opacity: interpolate(frame, [SEND + 158, SEND + 168], [0, 1], {
                     extrapolateLeft: "clamp",
                     extrapolateRight: "clamp",
                   }),

@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  Easing,
-  Img,
-  interpolate,
-  spring,
-  staticFile,
-  useVideoConfig,
-} from "remotion";
+import { Img, interpolate, spring, staticFile, useVideoConfig } from "remotion";
 import { SceneWrapper } from "../SceneWrapper";
 import { DotGrid } from "../Background";
 import { ChatBubble } from "../ChatBubble";
@@ -20,8 +13,6 @@ export const CHAT_BRIDGE_DURATION = 156;
 // — clearing the stage for the chat scene.
 const BUBBLES_EXIT = 122;
 
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
-
 // Bridge from the dashboard (5th scene) to the chat (6th). Same bubble
 // choreography as the survey→dashboard <Interlude/>, but over the warm
 // surveys-sun backdrop, with the prompt "Got your scores?" and the reply
@@ -32,28 +23,23 @@ export const ChatBridge: React.FC<{ durationInFrames: number }> = ({
   const frame = useAuthorFrame();
   const { fps } = useVideoConfig();
 
-  // The sun backdrop is opaque from the first frame (so the cool cloud
-  // background never shows through), and blooms in with a gentle scale. A cream
-  // wash on top — matching the dashboard we cut from — fades away over the first
-  // ~1.2s so the colour eases from cream into the warm pink rather than cutting.
-  const bgScale = interpolate(frame, [0, 46], [0.92, 1], {
-    ...clamp,
-    easing: (t) => 1 - Math.pow(1 - t, 3),
-  });
-  const creamWash = interpolate(frame, [0, 38], [1, 0], {
-    ...clamp,
-    easing: Easing.inOut(Easing.cubic),
-  });
+  // The dashboard exit has already swept the colour from cream into this warm
+  // surveys-sun pink and bloomed the backdrop to its settled scale, so the
+  // bridge simply continues on the fully-arrived sun — no re-bloom, no cream
+  // wash to fade — making the cut from the dashboard seamless. The sun stays
+  // opaque from the first frame so the cool cloud background never shows through.
+  const bgScale = 1;
 
-  // Each bubble pops with a slight overshoot.
+  // Each bubble pops with a slight overshoot — pulled forward so they arrive
+  // right as the pink settles, instead of leaving the warmed stage empty.
   const b1 = spring({
-    frame: frame - 34,
+    frame: frame - 20,
     fps,
     config: { damping: 12, mass: 0.8 },
     durationInFrames: 20,
   });
   const b2 = spring({
-    frame: frame - 56,
+    frame: frame - 42,
     fps,
     config: { damping: 12, mass: 0.8 },
     durationInFrames: 20,
@@ -94,17 +80,6 @@ export const ChatBridge: React.FC<{ durationInFrames: number }> = ({
         />
       </div>
 
-      {/* cream wash easing the colour in from the cream dashboard */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: COLORS.cream,
-          opacity: creamWash,
-          pointerEvents: "none",
-        }}
-      />
-
       {/* keep the dot texture present over the opaque sun backdrop, which
           otherwise hides the shader's dots for the whole scene */}
       <DotGrid />
@@ -126,7 +101,7 @@ export const ChatBridge: React.FC<{ durationInFrames: number }> = ({
             tailX="34%"
             reveal={b1}
             frame={frame}
-            typeStart={40}
+            typeStart={26}
             framesPerChar={1.1}
             primary={COLORS.ink}
             resting={COLORS.ink}
@@ -146,7 +121,7 @@ export const ChatBridge: React.FC<{ durationInFrames: number }> = ({
             tailX="64%"
             reveal={b2}
             frame={frame}
-            typeStart={62}
+            typeStart={48}
             framesPerChar={1.1}
             primary={COLORS.ink}
             resting={COLORS.ink}

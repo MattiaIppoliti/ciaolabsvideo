@@ -11,14 +11,14 @@ import {
 } from "../SurveyWindow";
 import { useAuthorFrame } from "../timing";
 
-export const SURVEY_DURATION = 180;
+export const SURVEY_DURATION = 100;
 
 // Beat the click lands on. Before it the screen shows the "95 / 52%" progress
 // state (the layout <Hero/> hands off on); after it the card 5 press effect
 // fires, the counter ticks, row 105 turns green and the violin "RESPONSE
 // PATTERN" reveals. The 2×3 grid is already settled at frame 0 — it carries
 // over from the Hero zoom rather than popping in, so there is no visible seam.
-const CLICK = 60;
+const CLICK = 36;
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -39,11 +39,10 @@ export const SurveyQuestion: React.FC<{ durationInFrames: number }> = ({
   // the press lingers in the familiar 2×3 grid for a beat, then the pane
   // reflows to the compact row + violin
   const reflow = interpolate(frame, [CLICK + 12, CLICK + 26], [0, 1], clamp);
-  const panelReveal = interpolate(frame, [CLICK + 22, CLICK + 46], [0, 1], {
+  const panelReveal = interpolate(frame, [CLICK + 18, CLICK + 38], [0, 1], {
     ...clamp,
     easing: Easing.out(Easing.cubic),
   });
-  const myDrop = interpolate(frame, [CLICK + 36, CLICK + 56], [0, 1], clamp);
 
   // gentle "pop" when the answer is committed
   const pressPulse = interpolate(
@@ -60,11 +59,11 @@ export const SurveyQuestion: React.FC<{ durationInFrames: number }> = ({
   const WIN_CY = SURVEY_WIN.height / 2; // 440
 
   // branded pointer glides in from the lower-right and taps card 5
-  const cx = interpolate(frame, [28, 56], [1230, CARD5.x], {
+  const cx = interpolate(frame, [12, 32], [1230, CARD5.x], {
     ...clamp,
     easing: Easing.out(Easing.cubic),
   });
-  const cy = interpolate(frame, [28, 56], [800, CARD5.y], {
+  const cy = interpolate(frame, [12, 32], [800, CARD5.y], {
     ...clamp,
     easing: Easing.out(Easing.cubic),
   });
@@ -75,7 +74,7 @@ export const SurveyQuestion: React.FC<{ durationInFrames: number }> = ({
     clamp,
   );
   const cursorOpacity =
-    interpolate(frame, [24, 32], [0, 1], clamp) *
+    interpolate(frame, [8, 16], [0, 1], clamp) *
     (1 - interpolate(frame, [CLICK + 6, CLICK + 16], [0, 1], clamp));
 
   // Virtual 3D camera over the window — same fly-over treatment as myvideo's
@@ -84,7 +83,7 @@ export const SurveyQuestion: React.FC<{ durationInFrames: number }> = ({
   // Focus (FX, FY) is a window-space point; the translate puts it dead-centre
   // at zoom Z, while RX/RY bank the window in 3D under <perspective>. It opens
   // flat (Z=1, no rotation) so <Hero/>'s gentle zoom lands on this exact frame.
-  const CAM_FRAMES = [0, 18, 50, 60, 66, 104, durationInFrames];
+  const CAM_FRAMES = [0, 8, 30, 36, 42, 68, durationInFrames];
   const CAM_FX = [WIN_CX, WIN_CX, CARD5.x, CARD5.x, CARD5.x, WIN_CX, WIN_CX];
   const CAM_FY = [WIN_CY, WIN_CY, CARD5.y, CARD5.y, CARD5.y, WIN_CY, WIN_CY];
   const CAM_Z = [1, 1.04, 1.68, 1.68, 1.62, 1, 1];
@@ -121,7 +120,6 @@ export const SurveyQuestion: React.FC<{ durationInFrames: number }> = ({
           sidebarT={sidebarT}
           reflow={reflow}
           panelReveal={panelReveal}
-          myDrop={myDrop}
           selectedActive={selected}
           pressPulse={pressPulse}
         />
