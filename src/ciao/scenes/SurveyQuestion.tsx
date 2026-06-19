@@ -37,11 +37,11 @@ export const SurveyQuestion: React.FC<{ durationInFrames: number }> = ({
   );
   const pct = Math.round((answered / TOTAL) * 100);
   const sidebarT = interpolate(frame, [CLICK, CLICK + 12], [0, 1], clamp);
-  // the press lingers in the familiar 2×3 grid while the thumbs-up celebration
-  // plays out at full zoom, then — as the camera pulls back — the pane reflows
-  // to the compact row + violin
-  const reflow = interpolate(frame, [CLICK + 40, CLICK + 56], [0, 1], clamp);
-  const panelReveal = interpolate(frame, [CLICK + 48, CLICK + 72], [0, 1], {
+  // right after the tap the camera pulls straight back out (no dead hold on the
+  // zoomed card) and, as it does, the pane reflows from the familiar 2×3 grid to
+  // the compact row + violin
+  const reflow = interpolate(frame, [CLICK + 8, CLICK + 24], [0, 1], clamp);
+  const panelReveal = interpolate(frame, [CLICK + 16, CLICK + 40], [0, 1], {
     ...clamp,
     easing: Easing.out(Easing.cubic),
   });
@@ -85,12 +85,13 @@ export const SurveyQuestion: React.FC<{ durationInFrames: number }> = ({
 
   // Virtual 3D camera over the window — same fly-over treatment as myvideo's
   // HowToAccess: holds on the full UI, swoops + zooms hard onto card 5 for the
-  // click, holds there through the thumbs-up celebration, then pulls back out as
-  // the pane reflows and the violin reveals.
+  // click, then pulls straight back out — only a short beat at full zoom
+  // (CLICK → CLICK+8) to register the tap, no long hold — as the pane reflows
+  // and the violin reveals.
   // Focus (FX, FY) is a window-space point; the translate puts it dead-centre
   // at zoom Z, while RX/RY bank the window in 3D under <perspective>. It opens
   // flat (Z=1, no rotation) so <Hero/>'s gentle zoom lands on this exact frame.
-  const CAM_FRAMES = [0, 8, 30, 76, 104, durationInFrames];
+  const CAM_FRAMES = [0, 8, 30, CLICK + 8, CLICK + 36, durationInFrames];
   const CAM_FX = [WIN_CX, WIN_CX, CARD5.x, CARD5.x, WIN_CX, WIN_CX];
   const CAM_FY = [WIN_CY, WIN_CY, CARD5.y, CARD5.y, WIN_CY, WIN_CY];
   const CAM_Z = [1, 1.04, 1.68, 1.68, 1, 1];
