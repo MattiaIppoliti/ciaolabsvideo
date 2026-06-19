@@ -46,16 +46,35 @@ export const NAV_ITEMS = [
   { label: "Chat", dot: COLORS.pomegranate },
 ] as const;
 
-// Personality dashboard scores (see screenshot 3).
+// Personality dashboard scores (see screenshot 3). `iqr` is the population
+// interquartile range (the "majority of people" band drawn as the outer curved
+// line) and `avg` is the population median marker that rides it — both on the
+// 0–50 scale.
 export const SCORES = [
-  { trait: "Openness", value: 42, band: "High", color: COLORS.slushie },
+  {
+    trait: "Openness",
+    value: 42,
+    band: "High",
+    color: COLORS.slushie,
+    iqr: [24, 40] as const,
+    avg: 31,
+  },
   {
     trait: "Conscientiousness",
     value: 35,
     band: "Middle",
     color: COLORS.lemon,
+    iqr: [23, 38] as const,
+    avg: 29,
   },
-  { trait: "Extraversion", value: 18, band: "Low", color: COLORS.pomegranate },
+  {
+    trait: "Extraversion",
+    value: 18,
+    band: "Low",
+    color: COLORS.pomegranate,
+    iqr: [22, 37] as const,
+    avg: 28,
+  },
 ] as const;
 
 export const TOP_TRAITS = [

@@ -3,6 +3,7 @@ import {
   Easing,
   Img,
   interpolate,
+  interpolateColors,
   spring,
   staticFile,
   useVideoConfig,
@@ -13,7 +14,6 @@ import { BrowserFrame } from "../BrowserFrame";
 import { Typewriter } from "../Typewriter";
 import { WavingIndicator } from "../WavingIndicator";
 import { LogoCursor, MorphCursor } from "../Cursor";
-import { CiaoLogo as CiaoWordmark } from "../CiaoLogo";
 import { COLORS, FONTS } from "../theme";
 import { useAuthorFrame } from "../timing";
 
@@ -194,8 +194,9 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
 
   // --- sign-off interaction: branded cursor taps the link pill ---------------
   // Once the pill has settled, the cursor glides onto it and clicks; on the tap
-  // the pill flips from the white "platform.ciaobang.com" link to a black chip
-  // carrying the waving "Ciao!" lockup (the same wave as the homepage nav).
+  // the white "platform.ciaobang.com" link dissolves and the big "👋 Ciao!"
+  // lockup rises from below to centre — full-screen, in black, with no pill
+  // behind it (the same wave as the homepage nav).
   const SIGN_CLICK = OUTRO_START + 60;
   const signEase = { ...clamp, easing: Easing.out(Easing.cubic) } as const;
   const signCx = interpolate(
@@ -219,7 +220,8 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
   const signCursorOpacity =
     interpolate(frame, [OUTRO_START + 30, OUTRO_START + 40], [0, 1], clamp) *
     (1 - interpolate(frame, [SIGN_CLICK + 8, SIGN_CLICK + 20], [0, 1], clamp));
-  // the pill flips white→black + link→lockup on the tap, with a press-pop
+  // on the tap the white link fades out (after a press-pop), handing the frame
+  // to the rising lockup
   const pillMorph = interpolate(
     frame,
     [SIGN_CLICK, SIGN_CLICK + 12],
@@ -232,6 +234,51 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
     [1, 0.95, 1],
     { ...clamp, easing: Easing.inOut(Easing.quad) },
   );
+  // Sign-off lockup — a huge "👋 Ciao!" that nearly fills the frame. On the tap
+  // the waving hand slides in from off-frame left and "Ciao!" is typed out
+  // letter by letter: each glyph is born in the warm accent and settles to
+  // black, with an accent caret riding the trailing edge that blinks once the
+  // word has landed. No pill behind it.
+  const LOCK_SIZE = 490;
+  const lockupTextStyle: React.CSSProperties = {
+    fontFamily: FONTS.sans,
+    fontWeight: 800,
+    fontSize: LOCK_SIZE,
+    letterSpacing: -0.4,
+    lineHeight: 1,
+  };
+  // friendly wave (~1.6Hz, ±18°), driven off real seconds (author fps = 30)
+  const handWave = Math.sin((frame / 30) * Math.PI * 2 * 1.6) * 18;
+  // hand sweeps in from off-frame left to its resting spot beside the word
+  const handSlideIn = interpolate(
+    frame,
+    [SIGN_CLICK, SIGN_CLICK + 16],
+    [-820, 0],
+    { ...clamp, easing: Easing.out(Easing.cubic) },
+  );
+
+  // --- "Ciao!" typewriter ----------------------------------------------------
+  // Each character is born in the warm accent and fades to the resting black
+  // over FADE_FRAMES; an accent pill caret rides the trailing edge of the latest
+  // glyph and blinks (~2Hz) once the whole word has been typed.
+  const TYPE_ACCENT = "#F4A8AB";
+  const CIAO = "Ciao!";
+  const CIAO_START = SIGN_CLICK + 8;
+  const FRAMES_PER_CHAR = 6;
+  const FADE_FRAMES = 6;
+  const typedCount = Math.max(
+    0,
+    Math.min(CIAO.length, Math.floor((frame - CIAO_START) / FRAMES_PER_CHAR) + 1),
+  );
+  const typingDone = CIAO_START + CIAO.length * FRAMES_PER_CHAR;
+  const caretBlink =
+    frame >= typingDone ? (Math.floor((frame / 30) * 4) % 2 === 0 ? 1 : 0) : 1;
+  const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+  const charColor = (i: number) => {
+    const age = frame - (CIAO_START + i * FRAMES_PER_CHAR);
+    const t = FADE_FRAMES <= 0 ? 1 : Math.max(0, Math.min(1, age / FADE_FRAMES));
+    return interpolateColors(easeOutCubic(t), [0, 1], [TYPE_ACCENT, "#000000"]);
+  };
 
   return (
     <SceneWrapper
@@ -695,8 +742,8 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
       </div>
 
       {/* sign-off: the platform link pill, centred over the orb. The cursor
-          taps it and it flips to a black chip carrying the waving "Ciao!"
-          lockup. */}
+          taps it; the link then dissolves and the big "Ciao!" lockup rises in
+          from below (the separate full-screen overlay just after this). */}
       <div
         style={{
           position: "absolute",
@@ -710,7 +757,8 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
         <div
           style={{
             position: "relative",
-            opacity: pillOpacity,
+            // fade the whole pill out on the tap so it hands off to the lockup
+            opacity: pillOpacity * (1 - pillMorph),
             transform: `translateY(${pillY}px) scale(${pillScale * pillPress})`,
           }}
         >
@@ -729,31 +777,79 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
               textDecoration: "underline",
               textDecorationThickness: 4,
               textUnderlineOffset: 10,
-              opacity: 1 - pillMorph,
             }}
           >
             platform.ciaobang.com
           </div>
-          {/* clicked state — flat solid-black chip with the waving Ciao! lockup */}
+        </div>
+      </div>
+
+      {/* sign-off lockup: a huge black "👋 Ciao!" that nearly fills the frame.
+          The waving hand slides in from off-frame left and "Ciao!" is typed out
+          beside it — each glyph born in the warm accent and settling to black,
+          an accent caret riding the trailing edge. No pill behind it. */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: LOCK_SIZE * 0.28,
+          }}
+        >
+          {/* waving hand — slides in from off-frame left, keeps waving */}
+          <Img
+            src={staticFile("ciao-sparkle.svg")}
+            style={{
+              width: LOCK_SIZE * 1.1,
+              height: LOCK_SIZE * 1.1,
+              transform: `translateX(${handSlideIn}px) rotate(${handWave}deg)`,
+              transformOrigin: "50% 80%",
+              flexShrink: 0,
+            }}
+          />
+          {/* "Ciao!" typewriter. The full word's width is reserved (untyped
+              glyphs render invisibly) and the accent caret is inserted between
+              the typed and untyped glyphs, so the lockup stays centred and the
+              hand never drifts as the word fills in. */}
           <div
             style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
+              ...lockupTextStyle,
+              display: "inline-flex",
               alignItems: "center",
-              justifyContent: "center",
-              // flat matte black — no gradient, sheen, or bevels.
-              background: "#000",
-              borderRadius: 999,
-              // single soft drop shadow for depth; no inset specular highlights.
-              boxShadow: "0 30px 70px rgba(20,18,14,0.45)",
-              opacity: pillMorph,
-              overflow: "hidden",
+              whiteSpace: "pre",
             }}
           >
-            <div style={{ position: "relative", zIndex: 1 }}>
-              <CiaoWordmark dark size={84} />
-            </div>
+            {CIAO.split("").map((ch, i) => (
+              <React.Fragment key={i}>
+                <span
+                  style={{ color: charColor(i), opacity: i < typedCount ? 1 : 0 }}
+                >
+                  {ch}
+                </span>
+                {i === typedCount - 1 && frame >= CIAO_START && (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 22,
+                      height: LOCK_SIZE * 0.72,
+                      marginLeft: 16,
+                      borderRadius: 11,
+                      background: TYPE_ACCENT,
+                      opacity: caretBlink,
+                    }}
+                  />
+                )}
+              </React.Fragment>
+            ))}
           </div>
         </div>
       </div>

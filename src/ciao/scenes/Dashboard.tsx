@@ -236,6 +236,8 @@ export const Dashboard: React.FC<{ durationInFrames: number }> = ({
                   band={s.band}
                   trait={s.trait}
                   color={s.color}
+                  iqr={s.iqr}
+                  avg={s.avg}
                   enterAt={10 + i * 12}
                   frame={frame}
                 />
@@ -356,17 +358,60 @@ const Gauge: React.FC<{
   band: string;
   trait: string;
   color: string;
+  iqr: readonly [number, number];
+  avg: number;
   enterAt: number;
   frame: number;
-}> = ({ value, band, trait, color, enterAt, frame }) => {
-  const progress = interpolate(frame, [enterAt, enterAt + 28], [0, value / 50], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const size = 240;
-  const stroke = 26;
-  const r = (size - stroke) / 2;
-  const c = Math.PI * r;
+}> = ({ value, band, trait, color, iqr, avg, enterAt, frame }) => {
+  const progress = interpolate(frame, [enterAt, enterAt + 28], [0, value / 50], clamp);
+  // the gauge furniture (ticks, numbers, outer IQR line + marker) fades in just
+  // behind the colour sweep
+  const reveal = interpolate(frame, [enterAt + 6, enterAt + 30], [0, 1], clamp);
+
+  // --- geometry: a semicircle swept from π (left) → 2π (right) over the top ---
+  const MAX = 50;
+  const W = 280;
+  const H = 148;
+  const cx = W / 2;
+  const cy = 132;
+  const stroke = 22;
+  const r = 98; // centre radius of the thick value arc
+  const len = Math.PI * r; // semicircle arc length (drives the dash animation)
+
+  const angleFor = (v: number) => Math.PI + (v / MAX) * Math.PI;
+  const pointAt = (v: number, radius: number) => {
+    const a = angleFor(v);
+    return [cx + Math.cos(a) * radius, cy + Math.sin(a) * radius] as const;
+  };
+
+  // "le varie barre": radial tick bars sitting just outside the arc — a minor
+  // tick every 2 units, a longer/darker major tick every 10.
+  const tickBase = r + stroke / 2 + 4;
+  const ticks = [];
+  for (let n = 0; n <= MAX; n += 2) {
+    const major = n % 10 === 0;
+    const [x1, y1] = pointAt(n, tickBase);
+    const [x2, y2] = pointAt(n, tickBase + (major ? 9 : 5));
+    ticks.push(
+      <line
+        key={n}
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke={major ? COLORS.muted : COLORS.oat}
+        strokeWidth={major ? 2.5 : 2}
+        strokeLinecap="round"
+      />,
+    );
+  }
+
+  // "la linea curva esterna": a thin grey arc beyond the ticks marking the
+  // population IQR ("majority of people"), with a median dot riding it.
+  const outerR = r + stroke / 2 + 22;
+  const [dotX, dotY] = pointAt(avg, outerR);
+  const labelR = r - stroke / 2 - 16;
+
   return (
     <div
       style={{
@@ -375,64 +420,68 @@ const Gauge: React.FC<{
         alignItems: "center",
       }}
     >
-      <svg
-        width={size}
-        height={size * 0.62}
-        viewBox={`0 0 ${size} ${size * 0.62}`}
-      >
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+        <g opacity={reveal}>
+          {/* outer curved line — the majority-of-people IQR band */}
+          <path
+            d={arcPath(cx, cy, outerR, angleFor(iqr[0]), angleFor(iqr[1]))}
+            fill="none"
+            stroke="#c4bfb4"
+            strokeWidth={3}
+            strokeLinecap="round"
+          />
+          {/* median marker dot riding the outer line */}
+          <circle
+            cx={dotX}
+            cy={dotY}
+            r={6}
+            fill={COLORS.muted}
+            stroke={COLORS.white}
+            strokeWidth={2}
+          />
+          {/* tick bars */}
+          {ticks}
+          {/* number labels inside the arc */}
+          {[0, 10, 20, 30, 40, 50].map((n) => {
+            const [x, y] = pointAt(n, labelR);
+            return (
+              <text
+                key={n}
+                x={x}
+                y={y}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize={14}
+                fill={COLORS.muted}
+                fontFamily="UncutSans"
+              >
+                {n}
+              </text>
+            );
+          })}
+        </g>
         {/* track */}
         <path
-          d={arcPath(size / 2, size / 2, r, Math.PI, 2 * Math.PI)}
+          d={arcPath(cx, cy, r, Math.PI, 2 * Math.PI)}
           fill="none"
           stroke={COLORS.oatLight}
           strokeWidth={stroke}
           strokeLinecap="round"
         />
-        {/* progress */}
+        {/* value sweep */}
         <path
-          d={arcPath(size / 2, size / 2, r, Math.PI, 2 * Math.PI)}
+          d={arcPath(cx, cy, r, Math.PI, 2 * Math.PI)}
           fill="none"
           stroke={color}
           strokeWidth={stroke}
           strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={c * (1 - progress)}
-        />
-        {/* ticks */}
-        {[0, 10, 20, 30, 40, 50].map((n) => {
-          const ang = Math.PI + (n / 50) * Math.PI;
-          const x = size / 2 + Math.cos(ang) * (r + 24);
-          const y = size / 2 + Math.sin(ang) * (r + 24);
-          return (
-            <text
-              key={n}
-              x={x}
-              y={y}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize={14}
-              fill={COLORS.muted}
-              fontFamily="UncutSans"
-            >
-              {n}
-            </text>
-          );
-        })}
-        {/* needle dot */}
-        <circle
-          cx={
-            size / 2 + Math.cos(Math.PI + (value / 50) * Math.PI) * r
-          }
-          cy={
-            size / 2 + Math.sin(Math.PI + (value / 50) * Math.PI) * r
-          }
-          r={9}
-          fill={COLORS.muted}
+          strokeDasharray={len}
+          strokeDashoffset={len * (1 - progress)}
         />
       </svg>
       <div
         style={{
-          marginTop: -10,
+          marginTop: -24,
           fontSize: 56,
           fontWeight: 800,
           letterSpacing: -1,
