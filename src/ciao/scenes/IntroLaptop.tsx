@@ -851,7 +851,7 @@ export const IntroLaptop: React.FC<{ durationInFrames: number }> = ({
                       }}
                     />
                     <OffthreadVideo
-                      src={staticFile("background-30s.webm")}
+                      src={staticFile("background-30s.mp4")}
                       muted
                       trimBefore={SEA_TRIM}
                       // Don't let a transient preview seek error throw a

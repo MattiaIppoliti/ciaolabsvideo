@@ -2,7 +2,7 @@ import React from "react";
 import { Img, interpolate, spring, staticFile, useVideoConfig } from "remotion";
 import { SceneWrapper } from "../SceneWrapper";
 import { DotGrid } from "../Background";
-import { SurveyWindow } from "../SurveyWindow";
+import { SurveyWindow, SURVEY_REST_OFFSET } from "../SurveyWindow";
 import { ChatBubble } from "../ChatBubble";
 import { COLORS, FONTS } from "../theme";
 import { useAuthorFrame } from "../timing";
@@ -111,7 +111,11 @@ export const Interlude: React.FC<{ durationInFrames: number }> = ({
       <DotGrid opacity={gradientOpacity} />
 
       {/* the settled survey window, sliding off to the left */}
-      <div style={{ transform: `translateX(${windowX}px)` }}>
+      <div
+        style={{
+          transform: `translateX(${windowX}px) translateY(${SURVEY_REST_OFFSET}px)`,
+        }}
+      >
         <SurveyWindow
           answered={96}
           pct={53}

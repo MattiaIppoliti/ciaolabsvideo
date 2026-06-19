@@ -1,17 +1,18 @@
 import React from "react";
 import { Easing, interpolate } from "remotion";
 import { SceneWrapper } from "../SceneWrapper";
-import { LogoCursor } from "../Cursor";
+import { PointerHandCursor } from "../Cursor";
 import {
   AFTER_COUNT,
   BEFORE_COUNT,
+  SURVEY_REST_OFFSET,
   SURVEY_WIN,
   SurveyWindow,
   TOTAL,
 } from "../SurveyWindow";
 import { useAuthorFrame } from "../timing";
 
-export const SURVEY_DURATION = 100;
+export const SURVEY_DURATION = 128;
 
 // Beat the click lands on. Before it the screen shows the "95 / 52%" progress
 // state (the layout <Hero/> hands off on); after it the card 5 press effect
@@ -36,10 +37,11 @@ export const SurveyQuestion: React.FC<{ durationInFrames: number }> = ({
   );
   const pct = Math.round((answered / TOTAL) * 100);
   const sidebarT = interpolate(frame, [CLICK, CLICK + 12], [0, 1], clamp);
-  // the press lingers in the familiar 2×3 grid for a beat, then the pane
-  // reflows to the compact row + violin
-  const reflow = interpolate(frame, [CLICK + 12, CLICK + 26], [0, 1], clamp);
-  const panelReveal = interpolate(frame, [CLICK + 18, CLICK + 38], [0, 1], {
+  // the press lingers in the familiar 2×3 grid while the thumbs-up celebration
+  // plays out at full zoom, then — as the camera pulls back — the pane reflows
+  // to the compact row + violin
+  const reflow = interpolate(frame, [CLICK + 40, CLICK + 56], [0, 1], clamp);
+  const panelReveal = interpolate(frame, [CLICK + 48, CLICK + 72], [0, 1], {
     ...clamp,
     easing: Easing.out(Easing.cubic),
   });
@@ -69,33 +71,41 @@ export const SurveyQuestion: React.FC<{ durationInFrames: number }> = ({
   });
   const press = interpolate(
     frame,
-    [CLICK - 4, CLICK, CLICK + 6],
+    [CLICK - 4, CLICK, CLICK + 4],
     [0, 1, 0],
     clamp,
   );
+  // the pointing hand simply taps card 5 to register the answer (no thumbs-up
+  // celebration here — that gesture now lives on the chat "send" tap). It lifts
+  // away promptly once the press releases (CLICK+4) so it doesn't sit frozen on
+  // the card while the camera holds on the selection.
   const cursorOpacity =
     interpolate(frame, [8, 16], [0, 1], clamp) *
-    (1 - interpolate(frame, [CLICK + 6, CLICK + 16], [0, 1], clamp));
+    (1 - interpolate(frame, [CLICK + 6, CLICK + 14], [0, 1], clamp));
 
   // Virtual 3D camera over the window — same fly-over treatment as myvideo's
   // HowToAccess: holds on the full UI, swoops + zooms hard onto card 5 for the
-  // click, then pulls back out as the pane reflows and the violin reveals.
+  // click, holds there through the thumbs-up celebration, then pulls back out as
+  // the pane reflows and the violin reveals.
   // Focus (FX, FY) is a window-space point; the translate puts it dead-centre
   // at zoom Z, while RX/RY bank the window in 3D under <perspective>. It opens
   // flat (Z=1, no rotation) so <Hero/>'s gentle zoom lands on this exact frame.
-  const CAM_FRAMES = [0, 8, 30, 36, 42, 68, durationInFrames];
-  const CAM_FX = [WIN_CX, WIN_CX, CARD5.x, CARD5.x, CARD5.x, WIN_CX, WIN_CX];
-  const CAM_FY = [WIN_CY, WIN_CY, CARD5.y, CARD5.y, CARD5.y, WIN_CY, WIN_CY];
-  const CAM_Z = [1, 1.04, 1.68, 1.68, 1.62, 1, 1];
-  const CAM_RX = [0, 1, 4, 4, 4, 0, 0];
-  const CAM_RY = [0, 0, -5, -5, -4, 0, 0];
+  const CAM_FRAMES = [0, 8, 30, 76, 104, durationInFrames];
+  const CAM_FX = [WIN_CX, WIN_CX, CARD5.x, CARD5.x, WIN_CX, WIN_CX];
+  const CAM_FY = [WIN_CY, WIN_CY, CARD5.y, CARD5.y, WIN_CY, WIN_CY];
+  const CAM_Z = [1, 1.04, 1.68, 1.68, 1, 1];
+  const CAM_RX = [0, 1, 4, 4, 0, 0];
+  const CAM_RY = [0, 0, -5, -5, 0, 0];
   const camEase = { ...clamp, easing: Easing.inOut(Easing.cubic) } as const;
   const camFx = interpolate(frame, CAM_FRAMES, CAM_FX, camEase);
   const camFy = interpolate(frame, CAM_FRAMES, CAM_FY, camEase);
   const camZ = interpolate(frame, CAM_FRAMES, CAM_Z, camEase);
   const camRx = interpolate(frame, CAM_FRAMES, CAM_RX, camEase);
   const camRy = interpolate(frame, CAM_FRAMES, CAM_RY, camEase);
+  // The leading translateY drops the whole window a touch below frame-centre
+  // (matching <Hero/> and <Interlude/>); the 3D fly-over rides on top of it.
   const cameraTransform =
+    `translateY(${SURVEY_REST_OFFSET}px) ` +
     `rotateX(${camRx}deg) rotateY(${camRy}deg) scale(${camZ}) ` +
     `translate(${-(camFx - WIN_CX)}px, ${-(camFy - WIN_CY)}px)`;
 
@@ -123,7 +133,12 @@ export const SurveyQuestion: React.FC<{ durationInFrames: number }> = ({
           selectedActive={selected}
           pressPulse={pressPulse}
         />
-        <LogoCursor x={cx} y={cy} press={press} opacity={cursorOpacity} />
+        <PointerHandCursor
+          x={cx}
+          y={cy}
+          press={press}
+          opacity={cursorOpacity}
+        />
       </div>
     </SceneWrapper>
   );

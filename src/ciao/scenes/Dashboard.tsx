@@ -14,11 +14,12 @@ import { Cursor } from "../Cursor";
 import { COLORS, FONTS, SCORES, TOP_TRAITS } from "../theme";
 import { useAuthorFrame } from "../timing";
 
-// 172 (not 180): once the window has launched off to the left and the cream
-// backdrop is fully up (~frame 168), the scene was holding on flat cream for
-// ~12 dead frames before the cut. Ending at 172 hands straight to the chat
-// bridge the moment the stage is clear, so the cream never lingers.
-export const DASHBOARD_DURATION = 172;
+// 184: the Fantasy zoom-out is a slow, gentle pull-back (28f), so the window's
+// launch + the warm surveys-sun bloom are pushed back to sit after it (they all
+// key off CLICK, below). The warm sun finishes blooming exactly on the last
+// frame, handing straight to the chat bridge with no flat-cream hold before the
+// cut. (Was 172 with a 16f pull-out.)
+export const DASHBOARD_DURATION = 184;
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -55,16 +56,16 @@ export const Dashboard: React.FC<{ durationInFrames: number }> = ({
   // --- camera fly-over onto the Fantasy bar (same treatment as the survey
   // click): hold on the full dashboard, push in onto the top trait as the
   // pointer clicks it, hold a beat while the detail card reveals, then ease back
-  // out to rest. The push-in (22f) and pull-out (16f) are deliberately gentle so
+  // out to rest. The push-in (22f) and pull-out (28f) are deliberately gentle so
   // neither move feels abrupt; the push-in still lands exactly on the click, and
-  // the pull-out tails just past the window's launch so it settles as the window
-  // is already accelerating off — an imperceptible overlap. Focus (FX, FY) is a
+  // the slow pull-out plays out fully on the held window, settling just before
+  // the window launches off so the move never feels abrupt. Focus (FX, FY) is a
   // window-space point; the translate puts it dead-centre at zoom Z while RX/RY
   // bank the window under <perspective>.
   const WIN_CX = WIN_W / 2;
   const WIN_CY = WIN_H / 2;
   const FOCUS = { x: 800, y: 675 }; // Fantasy bar centre in window space
-  const CAM_FRAMES = [0, 100, CLICK, CLICK + 16, CLICK + 32, durationInFrames];
+  const CAM_FRAMES = [0, 100, CLICK, CLICK + 16, CLICK + 44, durationInFrames];
   const CAM_FX = [WIN_CX, WIN_CX, FOCUS.x, FOCUS.x, WIN_CX, WIN_CX];
   const CAM_FY = [WIN_CY, WIN_CY, FOCUS.y, FOCUS.y, WIN_CY, WIN_CY];
   const CAM_Z = [1, 1, 1.45, 1.45, 1, 1];
@@ -92,7 +93,7 @@ export const Dashboard: React.FC<{ durationInFrames: number }> = ({
   // exit in the interlude — an exit only shows the accelerating launch, so the
   // spring's settle happens safely off-screen, handing over to the chat bridge.
   const exit = spring({
-    frame: frame - (CLICK + 28),
+    frame: frame - (CLICK + 40),
     fps,
     config: { damping: 18, mass: 0.9 },
     durationInFrames: 28,
@@ -101,7 +102,7 @@ export const Dashboard: React.FC<{ durationInFrames: number }> = ({
 
   // A cream backdrop fades in just before the window launches, so the window
   // slides off over cream rather than the cool cloud background.
-  const creamReveal = interpolate(frame, [CLICK + 22, CLICK + 34], [0, 1], clamp);
+  const creamReveal = interpolate(frame, [CLICK + 34, CLICK + 46], [0, 1], clamp);
 
   // ...but the cream is only a brief intermediate: the instant the window starts
   // leaving, the backdrop already begins warming into the chat bridge's
@@ -109,7 +110,7 @@ export const Dashboard: React.FC<{ durationInFrames: number }> = ({
   // next sequence as the dashboard clears, instead of dwelling on flat cream.
   // The sun is pixel-matched to <ChatBridge/> (same image, fit and settled
   // scale) and finishes blooming exactly at the cut, so the handover is seamless.
-  const warm = interpolate(frame, [CLICK + 28, durationInFrames], [0, 1], {
+  const warm = interpolate(frame, [CLICK + 40, durationInFrames], [0, 1], {
     ...clamp,
     easing: (t) => 1 - Math.pow(1 - t, 3),
   });

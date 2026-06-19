@@ -12,7 +12,7 @@ import { DotGrid } from "../Background";
 import { BrowserFrame } from "../BrowserFrame";
 import { Typewriter } from "../Typewriter";
 import { WavingIndicator } from "../WavingIndicator";
-import { LogoCursor } from "../Cursor";
+import { LogoCursor, MorphCursor } from "../Cursor";
 import { CiaoLogo as CiaoWordmark } from "../CiaoLogo";
 import { COLORS, FONTS } from "../theme";
 import { useAuthorFrame } from "../timing";
@@ -41,6 +41,14 @@ const OUTRO_START = 288;
 const SEND = 80;
 const TYPE_START = 30;
 const QUESTION = "What patterns stand out in my personality results?";
+
+// The send gesture (cursor tap → pointing-hand rolling into the thumbs-up "ok")
+// and the camera pull-back over the whole chat were a touch quick. We slow that
+// whole beat: the morph is stretched (the scaled `g` on <MorphCursor/>), the
+// pull-back takes longer (CAM_FRAMES), and the reply reveal is held back by
+// REPLY_HOLD frames so it still blooms as the camera settles rather than typing
+// in mid-zoom.
+const REPLY_HOLD = 12;
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -84,23 +92,34 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
 
   const sent = frame >= SEND;
 
-  // --- branded cursor: glides in over the input, then taps "send" -----------
-  const cx = interpolate(frame, [20, 46, 62, SEND], [1340, 880, 880, 1388], {
-    ...clamp,
-    easing: Easing.out(Easing.cubic),
-  });
-  const cy = interpolate(frame, [20, 46, 62, SEND], [860, 752, 752, 788], {
-    ...clamp,
-    easing: Easing.out(Easing.cubic),
-  });
-  const press = interpolate(frame, [SEND - 4, SEND, SEND + 6], [0, 1, 0], clamp);
+  // --- pointing hand: glides in over the input, taps "send", then morphs ------
+  // It glides to the send button, presses, and after the tap drifts slightly up
+  // and away from the button while the pointing hand rolls into a thumbs-up
+  // (see MorphCursor) — the little lift sells the gesture as a "sent!" cheer.
+  const cx = interpolate(
+    frame,
+    [20, 46, 62, SEND, SEND + 18],
+    [1340, 880, 880, 1388, 1414],
+    { ...clamp, easing: Easing.out(Easing.cubic) },
+  );
+  const cy = interpolate(
+    frame,
+    [20, 46, 62, SEND, SEND + 18],
+    [860, 752, 752, 788, 736],
+    { ...clamp, easing: Easing.out(Easing.cubic) },
+  );
+  const press = interpolate(frame, [SEND - 5, SEND, SEND + 9], [0, 1, 0], clamp);
+  // hold the hand on through the (now slower) morph + thumbs-up bounce — with the
+  // stretched `g` it settles at ~SEND+33 — then fade it out as the camera pulls
+  // back to reveal the reply.
   const cursorOpacity =
     interpolate(frame, [18, 28], [0, 1], clamp) *
-    (1 - interpolate(frame, [SEND + 6, SEND + 16], [0, 1], clamp));
-  // little press-pop on the send button when the click lands
+    (1 - interpolate(frame, [SEND + 40, SEND + 52], [0, 1], clamp));
+  // little press-pop on the send button when the click lands — eased out a touch
+  // slower to match the unhurried tap.
   const sendPulse = interpolate(
     frame,
-    [SEND - 3, SEND + 2, SEND + 12],
+    [SEND - 4, SEND + 2, SEND + 18],
     [1, 0.9, 1],
     { ...clamp, easing: Easing.inOut(Easing.quad) },
   );
@@ -112,7 +131,7 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
   const WIN_CX = 740;
   const WIN_CY = 440;
   const FOCUS = { x: 911, y: 770 };
-  const CAM_FRAMES = [0, 14, 36, SEND, SEND + 8, SEND + 32, durationInFrames];
+  const CAM_FRAMES = [0, 14, 36, SEND, SEND + 14, SEND + 44, durationInFrames];
   const CAM_FX = [WIN_CX, WIN_CX, FOCUS.x, FOCUS.x, FOCUS.x, WIN_CX, WIN_CX];
   const CAM_FY = [WIN_CY, WIN_CY, FOCUS.y, FOCUS.y, FOCUS.y, WIN_CY, WIN_CY];
   const CAM_Z = [1, 1.02, 1.5, 1.5, 1.48, 1, 1];
@@ -471,17 +490,26 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
                   display: "flex",
                   alignItems: "center",
                   gap: 8,
-                  opacity: interpolate(frame, [SEND + 24, SEND + 38], [0, 1], {
-                    extrapolateLeft: "clamp",
-                    extrapolateRight: "clamp",
-                  }),
+                  opacity: interpolate(
+                    frame,
+                    [SEND + REPLY_HOLD + 24, SEND + REPLY_HOLD + 38],
+                    [0, 1],
+                    {
+                      extrapolateLeft: "clamp",
+                      extrapolateRight: "clamp",
+                    },
+                  ),
                 }}
               >
                 <CiaoLogo size={18} />
                 Ask Ciao!
               </div>
               <div style={{ fontSize: 22, fontWeight: 600 }}>
-                <Typewriter text={ASSISTANT_REPLY} start={SEND + 34} cps={42} />
+                <Typewriter
+                  text={ASSISTANT_REPLY}
+                  start={SEND + REPLY_HOLD + 34}
+                  cps={42}
+                />
               </div>
               <ul
                 style={{
@@ -495,7 +523,7 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
                 }}
               >
                 {BULLETS.map((b, i) => {
-                  const start = SEND + 92 + i * 10;
+                  const start = SEND + REPLY_HOLD + 92 + i * 10;
                   const op = interpolate(frame, [start, start + 8], [0, 1], {
                     extrapolateLeft: "clamp",
                     extrapolateRight: "clamp",
@@ -545,10 +573,15 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
                   padding: "14px 18px",
                   fontSize: 18,
                   color: COLORS.inkSoft,
-                  opacity: interpolate(frame, [SEND + 130, SEND + 140], [0, 1], {
-                    extrapolateLeft: "clamp",
-                    extrapolateRight: "clamp",
-                  }),
+                  opacity: interpolate(
+                    frame,
+                    [SEND + REPLY_HOLD + 130, SEND + REPLY_HOLD + 140],
+                    [0, 1],
+                    {
+                      extrapolateLeft: "clamp",
+                      extrapolateRight: "clamp",
+                    },
+                  ),
                 }}
               >
                 <div
@@ -570,10 +603,15 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
               <div
                 style={{
                   marginTop: 4,
-                  opacity: interpolate(frame, [SEND + 158, SEND + 168], [0, 1], {
-                    extrapolateLeft: "clamp",
-                    extrapolateRight: "clamp",
-                  }),
+                  opacity: interpolate(
+                    frame,
+                    [SEND + REPLY_HOLD + 158, SEND + REPLY_HOLD + 168],
+                    [0, 1],
+                    {
+                      extrapolateLeft: "clamp",
+                      extrapolateRight: "clamp",
+                    },
+                  ),
                 }}
               >
                 <WavingIndicator size={40} />
@@ -643,7 +681,16 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
           </div>
         </div>
           </BrowserFrame>
-          <LogoCursor x={cx} y={cy} press={press} opacity={cursorOpacity} />
+          <MorphCursor
+            x={cx}
+            y={cy}
+            // Stretch the morph timeline (~0.72×) so the pointing-hand rolls into
+            // the thumbs-up "ok" slowly and clearly — it settles around SEND+33
+            // instead of snapping shut at SEND+24.
+            g={(frame - SEND) * 0.72}
+            press={press}
+            opacity={cursorOpacity}
+          />
         </div>
       </div>
 
@@ -687,7 +734,7 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
           >
             platform.ciaobang.com
           </div>
-          {/* clicked state — glossy metallic chip with the waving Ciao! lockup */}
+          {/* clicked state — flat solid-black chip with the waving Ciao! lockup */}
           <div
             style={{
               position: "absolute",
@@ -695,39 +742,15 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              // smoked-glass metal: a translucent warm-charcoal gradient (top
-              // sheen → dark belly → faint foot reflection) that lets the orb
-              // glow through, kept metallic by the rim + specular highlights.
-              background:
-                "linear-gradient(180deg, rgba(66,61,63,0.80) 0%, rgba(36,32,34,0.78) 16%, rgba(16,14,15,0.82) 50%, rgba(7,6,7,0.88) 78%, rgba(28,25,26,0.82) 100%)",
-              backdropFilter: "blur(26px) saturate(1.5)",
-              WebkitBackdropFilter: "blur(26px) saturate(1.5)",
-              border: "1.5px solid rgba(255,255,255,0.18)",
+              // flat matte black — no gradient, sheen, or bevels.
+              background: "#000",
               borderRadius: 999,
-              // outer drop + ambient, plus a gentler inset bevel: softer
-              // specular cap on top, dark seat on the bottom.
-              boxShadow: [
-                "0 30px 70px rgba(20,18,14,0.45)",
-                "0 2px 6px rgba(0,0,0,0.35)",
-                "inset 0 2px 1px rgba(255,255,255,0.28)",
-                "inset 0 8px 18px rgba(255,255,255,0.06)",
-                "inset 0 -3px 6px rgba(0,0,0,0.50)",
-              ].join(", "),
+              // single soft drop shadow for depth; no inset specular highlights.
+              boxShadow: "0 30px 70px rgba(20,18,14,0.45)",
               opacity: pillMorph,
               overflow: "hidden",
             }}
           >
-            {/* glossy specular highlight sweeping the top half */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                borderRadius: 999,
-                background:
-                  "linear-gradient(180deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.06) 36%, rgba(255,255,255,0) 52%)",
-                pointerEvents: "none",
-              }}
-            />
             <div style={{ position: "relative", zIndex: 1 }}>
               <CiaoWordmark dark size={84} />
             </div>

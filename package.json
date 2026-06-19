@@ -26,6 +26,7 @@
     "dev": "remotion studio",
     "build": "remotion bundle",
     "render": "remotion render Ciao out/ciao.mp4",
+    "render:mov": "remotion render Ciao out/ciao.mov --codec=prores --prores-profile=hq",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"
   },

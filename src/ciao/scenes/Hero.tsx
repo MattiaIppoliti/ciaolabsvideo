@@ -9,7 +9,8 @@ import {
 } from "remotion";
 import { SceneWrapper } from "../SceneWrapper";
 import { HomeScreen, SURVEY_PREVIEW_TOP } from "../HomeScreen";
-import { SurveyWindow } from "../SurveyWindow";
+import { ShellCard } from "../ShellCard";
+import { SurveyWindow, SURVEY_REST_OFFSET } from "../SurveyWindow";
 import { tl, useAuthorFrame } from "../timing";
 import { INTRO_DURATION, SEA_TRIM } from "./IntroLaptop";
 
@@ -58,10 +59,15 @@ export const Hero: React.FC<{ durationInFrames: number }> = ({
   // peeking-at-the-bottom all the way to frame-centre, where it sits at its
   // native 1480×880 — exactly where SurveyQuestion opens it. The page itself
   // does not scroll; only this window rises.
-  const previewY = interpolate(frame, [14, 100], [0, -SURVEY_PREVIEW_TOP + 100], {
-    ...clamp,
-    easing: Easing.inOut(Easing.cubic),
-  });
+  const previewY = interpolate(
+    frame,
+    [14, 100],
+    [0, -SURVEY_PREVIEW_TOP + 100 + SURVEY_REST_OFFSET],
+    {
+      ...clamp,
+      easing: Easing.inOut(Easing.cubic),
+    },
+  );
 
   // Gentle "zoom in leggero": a slight push toward the survey that eases back to
   // rest at scale 1 by the end. It is applied IDENTICALLY to the homepage layer
@@ -108,7 +114,7 @@ export const Hero: React.FC<{ durationInFrames: number }> = ({
             }}
           >
             <OffthreadVideo
-              src={staticFile("background-30s.webm")}
+              src={staticFile("background-30s.mp4")}
               muted
               trimBefore={seaTrim}
               // A transient seek error while scrubbing the preview must not throw a
@@ -129,6 +135,18 @@ export const Hero: React.FC<{ durationInFrames: number }> = ({
                 objectFit: "cover",
               }}
             />
+            {/* Warm hero-sun card over the sea — the SAME layer the laptop
+                screen shows (sea → ShellCard@0.6 → page). Diving out of the
+                laptop therefore lands on a pixel-identical stack and the framed
+                sun stays put instead of vanishing. It lives inside the
+                settle/zoom transforms so it stays locked to the page, and fades
+                out with the rest of the homepage chrome via the parent
+                `heroOpacity`. (Previously this came from a global <ShellCard/>
+                in <CiaoVideo/>, but that sat BEHIND this scene's opaque sea
+                video and was never visible.) */}
+            <div style={{ position: "absolute", inset: 0, opacity: 0.6 }}>
+              <ShellCard />
+            </div>
             <HomeScreen
               headlineY={headlineY}
               headlineOpacity={copyOpacity}
@@ -144,7 +162,12 @@ export const Hero: React.FC<{ durationInFrames: number }> = ({
           it sits exactly where the homepage preview was and settles onto
           SurveyQuestion's opening frame. The boundary then cross-fades between
           identical frames (no visible cut). */}
-      <div style={{ opacity: winReveal, transform: `scale(${zoom})` }}>
+      <div
+        style={{
+          opacity: winReveal,
+          transform: `translateY(${SURVEY_REST_OFFSET}px) scale(${zoom})`,
+        }}
+      >
         <SurveyWindow />
       </div>
     </SceneWrapper>

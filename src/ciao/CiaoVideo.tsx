@@ -10,7 +10,6 @@ import {
 import { RENDER_FPS, tl } from "./timing";
 import { loadCiaoFonts } from "./fonts";
 import { Background } from "./Background";
-import { ShellCard } from "./ShellCard";
 import {
   SearchIntro,
   SEARCH_INTRO_DURATION,
@@ -54,18 +53,12 @@ export const PLAYBACK_DURATION = tl(LAPTOP_START) + tl(TOTAL_DURATION);
 
 export const CiaoVideo: React.FC = () => {
   loadCiaoFonts();
-  // The warm hero-sun aura + card belong only to the hero (home) scene. The
-  // intro laptop scene and the survey/dashboard/chat scenes sit on the bare
-  // moving-cloud <Background/>, so the aura is scoped to the hero window and
-  // eases in/out at its boundaries.
-  const HERO_FROM = tl(SCENES.intro);
-  // The warm hero-sun aura must vanish in lock-step with the homepage chrome
-  // (nav buttons + survey preview), which <Hero/> fades out over author frames
-  // 100→134 via `heroOpacity`. So bound the aura's Sequence to end at author
-  // frame 134 and dissolve it across that same 100→134 window — otherwise the
-  // sun lingers ~16 frames after the nav buttons are already gone.
-  const SUN_END = tl(134);
-  const SUN_FADE = tl(34);
+  // The warm hero-sun aura + card belong only to the hero (home) scene, where
+  // <Hero/> now renders the <ShellCard/> itself — layered over its sea video and
+  // locked to the homepage through the zoom (matching the laptop screen's own
+  // stack), so the framed sun stays visible across the dive out of the laptop.
+  // The intro laptop scene and the survey/dashboard/chat scenes sit on the bare
+  // moving-cloud <Background/>.
 
   // Soundtrack — plays across the whole film and eases its volume down over the
   // final FADE_OUT seconds so the music lands softly on the last frame instead
@@ -95,13 +88,6 @@ export const CiaoVideo: React.FC = () => {
         <SearchIntro durationInFrames={SEARCH_INTRO_DURATION} />
       </Sequence>
       <Sequence from={tl(LAPTOP_START)}>
-        <Sequence from={HERO_FROM} durationInFrames={SUN_END}>
-          <ShellCard
-            durationInFrames={SUN_END}
-            fadeIn={tl(12)}
-            fadeOut={SUN_FADE}
-          />
-        </Sequence>
         <Series>
         <Series.Sequence durationInFrames={tl(SCENES.intro)}>
           <IntroLaptop durationInFrames={SCENES.intro} />

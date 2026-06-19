@@ -13,6 +13,14 @@ import { COLORS, FONTS, LIKERT, RESPONSE_PATTERN, SURVEY_LIST } from "./theme";
 // opens on it.
 export const SURVEY_WIN = { width: 1480, height: 880 } as const;
 
+// A small downward nudge applied to the survey window's RESTING position so it
+// doesn't crowd the homepage nav (the "Sign in to start" bar) when it rises into
+// place in <Hero/>. Shared by every scene that shows the window at rest — <Hero/>
+// (rising preview + standalone), <SurveyQuestion/> and <Interlude/> — so the
+// pixel-identical, seamless cuts between them are preserved while it all sits a
+// touch lower in the frame.
+export const SURVEY_REST_OFFSET = 56;
+
 // The question shown in the pane (row 105 in the progress list) and the option that
 // gets "clicked".
 export const ACTIVE_INDEX = 1; // index into SURVEY_LIST -> num 105
