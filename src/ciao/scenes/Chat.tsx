@@ -3,7 +3,6 @@ import {
   Easing,
   Img,
   interpolate,
-  interpolateColors,
   spring,
   staticFile,
   useVideoConfig,
@@ -17,10 +16,11 @@ import { LogoCursor, MorphCursor } from "../Cursor";
 import { COLORS, FONTS } from "../theme";
 import { useAuthorFrame } from "../timing";
 
-// +30 author frames (1s @ 30fps) of tail after the pill flips to the Ciao!
-// lockup, so the waving sparkle completes its loop before the video ends.
-// (Was 464 — trimmed 50 author frames of the static hold that used to sit
-// before the outro, see OUTRO_START, so the closing window-drop begins as soon
+// Tail after the link is tapped, so the closing wave (the white Ciao! hand,
+// ciao-hand-final.png, that pops in above the platform.ciaobang.com link) plays
+// out before the video ends. (Was 464 — trimmed 50 author frames of the static
+// hold that used to sit before the outro, see OUTRO_START, so the closing
+// window-drop begins as soon
 // as the conversation has settled instead of lingering on a frozen frame.)
 export const CHAT_DURATION = 414;
 
@@ -193,10 +193,10 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
   );
 
   // --- sign-off interaction: branded cursor taps the link pill ---------------
-  // Once the pill has settled, the cursor glides onto it and clicks; on the tap
-  // the white "platform.ciaobang.com" link dissolves and the big "👋 Ciao!"
-  // lockup rises from below to centre — full-screen, in black, with no pill
-  // behind it (the same wave as the homepage nav).
+  // Once the pill has settled, the cursor glides onto it and clicks. The film
+  // ends on the "platform.ciaobang.com" link itself — the link stays put and,
+  // on the tap, the white Ciao! waving hand (ciao-hand-final.png) pops in just
+  // above it and waves goodbye, using the same wave as the homepage lockup.
   const SIGN_CLICK = OUTRO_START + 60;
   const signEase = { ...clamp, easing: Easing.out(Easing.cubic) } as const;
   const signCx = interpolate(
@@ -220,65 +220,44 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
   const signCursorOpacity =
     interpolate(frame, [OUTRO_START + 30, OUTRO_START + 40], [0, 1], clamp) *
     (1 - interpolate(frame, [SIGN_CLICK + 8, SIGN_CLICK + 20], [0, 1], clamp));
-  // on the tap the white link fades out (after a press-pop), handing the frame
-  // to the rising lockup
-  const pillMorph = interpolate(
-    frame,
-    [SIGN_CLICK, SIGN_CLICK + 12],
-    [0, 1],
-    clamp,
-  );
+  // little press-pop on the link pill when the tap lands — the link stays put
   const pillPress = interpolate(
     frame,
     [SIGN_CLICK - 3, SIGN_CLICK + 2, SIGN_CLICK + 12],
     [1, 0.95, 1],
     { ...clamp, easing: Easing.inOut(Easing.quad) },
   );
-  // Sign-off lockup — a huge "👋 Ciao!" that nearly fills the frame. On the tap
-  // the waving hand slides in from off-frame left and "Ciao!" is typed out
-  // letter by letter: each glyph is born in the warm accent and settles to
-  // black, with an accent caret riding the trailing edge that blinks once the
-  // word has landed. No pill behind it.
-  const LOCK_SIZE = 490;
-  const lockupTextStyle: React.CSSProperties = {
-    fontFamily: FONTS.sans,
-    fontWeight: 800,
-    fontSize: LOCK_SIZE,
-    letterSpacing: -0.4,
-    lineHeight: 1,
-  };
-  // friendly wave (~1.6Hz, ±18°), driven off real seconds (author fps = 30)
-  const handWave = Math.sin((frame / 30) * Math.PI * 2 * 1.6) * 18;
-  // hand sweeps in from off-frame left to its resting spot beside the word
-  const handSlideIn = interpolate(
+  // as the hand pops in on the tap, the link bubble eases down a few px to open
+  // a little breathing room for the wave above it — a small, gentle settle.
+  const pillNudge = interpolate(
     frame,
-    [SIGN_CLICK, SIGN_CLICK + 16],
-    [-820, 0],
+    [SIGN_CLICK, SIGN_CLICK + 14],
+    [0, 24],
     { ...clamp, easing: Easing.out(Easing.cubic) },
   );
-
-  // --- "Ciao!" typewriter ----------------------------------------------------
-  // Each character is born in the warm accent and fades to the resting black
-  // over FADE_FRAMES; an accent pill caret rides the trailing edge of the latest
-  // glyph and blinks (~2Hz) once the whole word has been typed.
-  const TYPE_ACCENT = "#F4A8AB";
-  const CIAO = "Ciao!";
-  const CIAO_START = SIGN_CLICK + 8;
-  const FRAMES_PER_CHAR = 6;
-  const FADE_FRAMES = 6;
-  const typedCount = Math.max(
-    0,
-    Math.min(CIAO.length, Math.floor((frame - CIAO_START) / FRAMES_PER_CHAR) + 1),
+  // Sign-off wave — once the link is tapped, the white Ciao! waving hand
+  // (ciao-hand-final.png) pops in just above the platform.ciaobang.com link and
+  // keeps waving (the same wave as the homepage lockup) as the film closes.
+  // There is no "Ciao!" wordmark: the film ends on the link itself.
+  const HAND_SIZE = 300;
+  // friendly wave (~1.6Hz, ±18°), driven off real seconds (author fps = 30)
+  const handWave = Math.sin((frame / 30) * Math.PI * 2 * 1.6) * 18;
+  // on the tap the hand pops in — small and a touch below its resting spot —
+  // then springs up above the pill with a slight overshoot and holds, waving.
+  const handPop = spring({
+    frame: frame - SIGN_CLICK,
+    fps,
+    config: { damping: 12, mass: 0.7 },
+    durationInFrames: 22,
+  });
+  const handScale = interpolate(handPop, [0, 1], [0.5, 1]);
+  const handRise = interpolate(handPop, [0, 1], [60, 0]);
+  const handOpacity = interpolate(
+    frame,
+    [SIGN_CLICK, SIGN_CLICK + 8],
+    [0, 1],
+    clamp,
   );
-  const typingDone = CIAO_START + CIAO.length * FRAMES_PER_CHAR;
-  const caretBlink =
-    frame >= typingDone ? (Math.floor((frame / 30) * 4) % 2 === 0 ? 1 : 0) : 1;
-  const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-  const charColor = (i: number) => {
-    const age = frame - (CIAO_START + i * FRAMES_PER_CHAR);
-    const t = FADE_FRAMES <= 0 ? 1 : Math.max(0, Math.min(1, age / FADE_FRAMES));
-    return interpolateColors(easeOutCubic(t), [0, 1], [TYPE_ACCENT, "#000000"]);
-  };
 
   return (
     <SceneWrapper
@@ -742,8 +721,8 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
       </div>
 
       {/* sign-off: the platform link pill, centred over the orb. The cursor
-          taps it; the link then dissolves and the big "Ciao!" lockup rises in
-          from below (the separate full-screen overlay just after this). */}
+          taps it; the link stays put as the closing frame and the waving hand
+          pops in above it (the separate full-screen overlay just after this). */}
       <div
         style={{
           position: "absolute",
@@ -757,9 +736,8 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
         <div
           style={{
             position: "relative",
-            // fade the whole pill out on the tap so it hands off to the lockup
-            opacity: pillOpacity * (1 - pillMorph),
-            transform: `translateY(${pillY}px) scale(${pillScale * pillPress})`,
+            opacity: pillOpacity,
+            transform: `translateY(${pillY + pillNudge}px) scale(${pillScale * pillPress})`,
           }}
         >
           {/* link state — the underlined platform URL */}
@@ -784,10 +762,10 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
         </div>
       </div>
 
-      {/* sign-off lockup: a huge black "👋 Ciao!" that nearly fills the frame.
-          The waving hand slides in from off-frame left and "Ciao!" is typed out
-          beside it — each glyph born in the warm accent and settling to black,
-          an accent caret riding the trailing edge. No pill behind it. */}
+      {/* sign-off wave: the white Ciao! waving hand (ciao-hand-final.png) pops
+          in just above the platform.ciaobang.com link on the tap and keeps
+          waving (same wave as the homepage lockup) as the film closes. No
+          "Ciao!" wordmark — the link itself is the closing frame. */}
       <div
         style={{
           position: "absolute",
@@ -798,60 +776,19 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
           pointerEvents: "none",
         }}
       >
-        <div
+        <Img
+          src={staticFile("ciao-hand-final.png")}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: LOCK_SIZE * 0.28,
+            width: HAND_SIZE,
+            height: HAND_SIZE,
+            // sit above the centred link pill; pop in + rise on the tap, waving
+            transform:
+              `translateY(${-220 + handRise}px) ` +
+              `scale(${handScale}) rotate(${handWave}deg)`,
+            transformOrigin: "50% 80%",
+            opacity: handOpacity,
           }}
-        >
-          {/* waving hand — slides in from off-frame left, keeps waving */}
-          <Img
-            src={staticFile("ciao-sparkle.svg")}
-            style={{
-              width: LOCK_SIZE * 1.1,
-              height: LOCK_SIZE * 1.1,
-              transform: `translateX(${handSlideIn}px) rotate(${handWave}deg)`,
-              transformOrigin: "50% 80%",
-              flexShrink: 0,
-            }}
-          />
-          {/* "Ciao!" typewriter. The full word's width is reserved (untyped
-              glyphs render invisibly) and the accent caret is inserted between
-              the typed and untyped glyphs, so the lockup stays centred and the
-              hand never drifts as the word fills in. */}
-          <div
-            style={{
-              ...lockupTextStyle,
-              display: "inline-flex",
-              alignItems: "center",
-              whiteSpace: "pre",
-            }}
-          >
-            {CIAO.split("").map((ch, i) => (
-              <React.Fragment key={i}>
-                <span
-                  style={{ color: charColor(i), opacity: i < typedCount ? 1 : 0 }}
-                >
-                  {ch}
-                </span>
-                {i === typedCount - 1 && frame >= CIAO_START && (
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: 22,
-                      height: LOCK_SIZE * 0.72,
-                      marginLeft: 16,
-                      borderRadius: 11,
-                      background: TYPE_ACCENT,
-                      opacity: caretBlink,
-                    }}
-                  />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
+        />
       </div>
 
       {/* sign-off cursor: glides onto the pill and taps it */}
