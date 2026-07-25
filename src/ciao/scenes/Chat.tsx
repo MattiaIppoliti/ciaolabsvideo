@@ -1,37 +1,20 @@
 import React from "react";
-import {
-  Easing,
-  Img,
-  interpolate,
-  spring,
-  staticFile,
-  useVideoConfig,
-} from "remotion";
+import { Easing, interpolate } from "remotion";
 import { SceneWrapper } from "../SceneWrapper";
-import { DotGrid } from "../Background";
 import { BrowserFrame } from "../BrowserFrame";
 import { Typewriter } from "../Typewriter";
 import { WavingIndicator } from "../WavingIndicator";
-import { LogoCursor, MorphCursor } from "../Cursor";
+import { MorphCursor } from "../Cursor";
 import { COLORS, FONTS } from "../theme";
 import { useAuthorFrame } from "../timing";
 
-// Tail after the link is tapped, so the closing wave (the white Ciao! hand,
-// ciao-hand-final.png, that pops in above the platform.ciaobang.com link) plays
-// out before the video ends. (Was 464 — trimmed 50 author frames of the static
-// hold that used to sit before the outro, see OUTRO_START, so the closing
-// window-drop begins as soon
-// as the conversation has settled instead of lingering on a frozen frame.)
-export const CHAT_DURATION = 414;
-
-// Closing beat. Once the conversation has fully read out, the whole window
-// glides from centre down off the bottom edge — handing the frame to the
-// sign-off: the `surveys-sun-blue` orb blooms in behind, and a centred pill
-// carrying the platform link rises from below to settle dead-centre over it.
-// Begins ~40 author frames after the last reveal (the "Waving…" indicator at
-// ~248) — just enough for the conversation to settle, without the extra ~50
-// frames of dead hold that used to sit here (was 338).
-const OUTRO_START = 288;
+// The film now ends on the conversation itself: the closing sign-off beat (the
+// window dropping away to the `surveys-sun-blue` orb, the platform link pill
+// and the waving Ciao! hand) has been cut. The duration is just the read-out
+// plus a short hold — the last reveal (the "Waving…" indicator) lands at ~260,
+// so ~40 frames of tail let it settle before the film ends. (Was 414, which
+// included the ~126-frame outro from author frame 288.)
+export const CHAT_DURATION = 300;
 
 // The scene opens by simulating the question being typed into the composer:
 // the camera flies down onto the input bar (same 3D treatment as the survey),
@@ -147,167 +130,21 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
     `rotateX(${camRx}deg) rotateY(${camRy}deg) scale(${camZ}) ` +
     `translate(${-(camFx - WIN_CX)}px, ${-(camFy - WIN_CY)}px)`;
 
-  const { fps } = useVideoConfig();
-
-  // --- outro: window drops away, orb backdrop + link pill take over ----------
-  // The window launches downward with the same springy elasticity as the survey
-  // window's exit in the interlude — an exit only shows the accelerating launch,
-  // so the spring's settle lands safely off-screen.
-  const winExit = spring({
-    frame: frame - OUTRO_START,
-    fps,
-    config: { damping: 20, mass: 0.9 },
-    durationInFrames: 26,
-  });
-  const winY = interpolate(winExit, [0, 1], [0, 1500]);
-  const winOpacity = interpolate(
-    frame,
-    [OUTRO_START + 8, OUTRO_START + 30],
-    [1, 0],
-    clamp,
-  );
-
-  // The orb blooms in behind the leaving window.
-  const orbOpacity = interpolate(
-    frame,
-    [OUTRO_START + 6, OUTRO_START + 30],
-    [0, 1],
-    clamp,
-  );
-
-  // The link pill rises from below the frame to settle dead-centre, with a
-  // slight overshoot.
-  const pillRise = spring({
-    frame: frame - (OUTRO_START + 16),
-    fps,
-    config: { damping: 13, mass: 0.85 },
-    durationInFrames: 24,
-  });
-  const pillY = interpolate(pillRise, [0, 1], [560, 0]);
-  const pillScale = interpolate(pillRise, [0, 1], [0.86, 1]);
-  const pillOpacity = interpolate(
-    frame,
-    [OUTRO_START + 16, OUTRO_START + 30],
-    [0, 1],
-    clamp,
-  );
-
-  // --- sign-off interaction: branded cursor taps the link pill ---------------
-  // Once the pill has settled, the cursor glides onto it and clicks. The film
-  // ends on the "platform.ciaobang.com" link itself — the link stays put and,
-  // on the tap, the white Ciao! waving hand (ciao-hand-final.png) pops in just
-  // above it and waves goodbye, using the same wave as the homepage lockup.
-  const SIGN_CLICK = OUTRO_START + 60;
-  const signEase = { ...clamp, easing: Easing.out(Easing.cubic) } as const;
-  const signCx = interpolate(
-    frame,
-    [OUTRO_START + 34, SIGN_CLICK],
-    [1240, 1004],
-    signEase,
-  );
-  const signCy = interpolate(
-    frame,
-    [OUTRO_START + 34, SIGN_CLICK],
-    [792, 556],
-    signEase,
-  );
-  const signPress = interpolate(
-    frame,
-    [SIGN_CLICK - 4, SIGN_CLICK, SIGN_CLICK + 6],
-    [0, 1, 0],
-    clamp,
-  );
-  const signCursorOpacity =
-    interpolate(frame, [OUTRO_START + 30, OUTRO_START + 40], [0, 1], clamp) *
-    (1 - interpolate(frame, [SIGN_CLICK + 8, SIGN_CLICK + 20], [0, 1], clamp));
-  // little press-pop on the link pill when the tap lands — the link stays put
-  const pillPress = interpolate(
-    frame,
-    [SIGN_CLICK - 3, SIGN_CLICK + 2, SIGN_CLICK + 12],
-    [1, 0.95, 1],
-    { ...clamp, easing: Easing.inOut(Easing.quad) },
-  );
-  // as the hand pops in on the tap, the link bubble eases down a few px to open
-  // a little breathing room for the wave above it — a small, gentle settle.
-  const pillNudge = interpolate(
-    frame,
-    [SIGN_CLICK, SIGN_CLICK + 14],
-    [0, 24],
-    { ...clamp, easing: Easing.out(Easing.cubic) },
-  );
-  // Sign-off wave — once the link is tapped, the white Ciao! waving hand
-  // (ciao-hand-final.png) pops in just above the platform.ciaobang.com link and
-  // keeps waving (the same wave as the homepage lockup) as the film closes.
-  // There is no "Ciao!" wordmark: the film ends on the link itself.
-  const HAND_SIZE = 300;
-  // friendly wave (~1.6Hz, ±18°), driven off real seconds (author fps = 30)
-  const handWave = Math.sin((frame / 30) * Math.PI * 2 * 1.6) * 18;
-  // on the tap the hand pops in — small and a touch below its resting spot —
-  // then springs up above the pill with a slight overshoot and holds, waving.
-  const handPop = spring({
-    frame: frame - SIGN_CLICK,
-    fps,
-    config: { damping: 12, mass: 0.7 },
-    durationInFrames: 22,
-  });
-  const handScale = interpolate(handPop, [0, 1], [0.5, 1]);
-  const handRise = interpolate(handPop, [0, 1], [60, 0]);
-  const handOpacity = interpolate(
-    frame,
-    [SIGN_CLICK, SIGN_CLICK + 8],
-    [0, 1],
-    clamp,
-  );
-
   return (
     <SceneWrapper
       durationInFrames={durationInFrames}
       fadeOut={0}
       style={{ perspective: 2000 }}
     >
-      {/* orb backdrop for the sign-off — revealed beneath the window as it
-          drops away, then sits behind the link pill */}
       <div
         style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: orbOpacity,
+          position: "relative",
+          width: 1480,
+          height: 880,
+          transform: cameraTransform,
         }}
       >
-        <Img
-          src={staticFile("surveys-sun-blue.webp")}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            objectPosition: "center top",
-            // Feather the top edge so the orb rises out of the moving-cloud
-            // <Background/> instead of meeting it on a hard horizontal seam —
-            // softens the hand-off from the previous sequence.
-            WebkitMaskImage:
-              "linear-gradient(to bottom, transparent 0%, black 0%)",
-            maskImage: "linear-gradient(to bottom, transparent 0%, black 0%)",
-          }}
-        />
-      </div>
-
-      {/* keep the dot texture present over the orb backdrop, which otherwise
-          hides the shader's dots — fades in with the orb */}
-      <DotGrid opacity={orbOpacity} />
-
-      <div style={{ transform: `translateY(${winY}px)`, opacity: winOpacity }}>
-        <div
-          style={{
-            position: "relative",
-            width: 1480,
-            height: 880,
-            transform: cameraTransform,
-          }}
-        >
-          <BrowserFrame
+        <BrowserFrame
           url="platform.ciaobang.com/app"
           width={1480}
           height={880}
@@ -706,98 +543,18 @@ export const Chat: React.FC<{ durationInFrames: number }> = ({
             </div>
           </div>
         </div>
-          </BrowserFrame>
-          <MorphCursor
-            x={cx}
-            y={cy}
-            // Stretch the morph timeline (~0.72×) so the pointing-hand rolls into
-            // the thumbs-up "ok" slowly and clearly — it settles around SEND+33
-            // instead of snapping shut at SEND+24.
-            g={(frame - SEND) * 0.72}
-            press={press}
-            opacity={cursorOpacity}
-          />
-        </div>
-      </div>
-
-      {/* sign-off: the platform link pill, centred over the orb. The cursor
-          taps it; the link stays put as the closing frame and the waving hand
-          pops in above it (the separate full-screen overlay just after this). */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          pointerEvents: "none",
-        }}
-      >
-        <div
-          style={{
-            position: "relative",
-            opacity: pillOpacity,
-            transform: `translateY(${pillY + pillNudge}px) scale(${pillScale * pillPress})`,
-          }}
-        >
-          {/* link state — the underlined platform URL */}
-          <div
-            style={{
-              background: COLORS.white,
-              borderRadius: 999,
-              padding: "34px 70px",
-              fontFamily: FONTS.sans,
-              fontSize: 62,
-              fontWeight: 700,
-              color: COLORS.ink,
-              whiteSpace: "nowrap",
-              boxShadow: "0 30px 70px rgba(40,35,28,0.24)",
-              textDecoration: "underline",
-              textDecorationThickness: 4,
-              textUnderlineOffset: 10,
-            }}
-          >
-            platform.ciaobang.com
-          </div>
-        </div>
-      </div>
-
-      {/* sign-off wave: the white Ciao! waving hand (ciao-hand-final.png) pops
-          in just above the platform.ciaobang.com link on the tap and keeps
-          waving (same wave as the homepage lockup) as the film closes. No
-          "Ciao!" wordmark — the link itself is the closing frame. */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          pointerEvents: "none",
-        }}
-      >
-        <Img
-          src={staticFile("ciao-hand-final.png")}
-          style={{
-            width: HAND_SIZE,
-            height: HAND_SIZE,
-            // sit above the centred link pill; pop in + rise on the tap, waving
-            transform:
-              `translateY(${-220 + handRise}px) ` +
-              `scale(${handScale}) rotate(${handWave}deg)`,
-            transformOrigin: "50% 80%",
-            opacity: handOpacity,
-          }}
+        </BrowserFrame>
+        <MorphCursor
+          x={cx}
+          y={cy}
+          // Stretch the morph timeline (~0.72×) so the pointing-hand rolls into
+          // the thumbs-up "ok" slowly and clearly — it settles around SEND+33
+          // instead of snapping shut at SEND+24.
+          g={(frame - SEND) * 0.72}
+          press={press}
+          opacity={cursorOpacity}
         />
       </div>
-
-      {/* sign-off cursor: glides onto the pill and taps it */}
-      <LogoCursor
-        x={signCx}
-        y={signCy}
-        press={signPress}
-        opacity={signCursorOpacity}
-      />
     </SceneWrapper>
   );
 };
